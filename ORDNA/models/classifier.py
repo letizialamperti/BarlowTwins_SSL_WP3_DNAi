@@ -5,9 +5,14 @@ from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix
 
 class Classifier(pl.LightningModule):
-    def __init__(self, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5):
+    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5):
         super().__init__()
+        self.barlow_twins_model = barlow_twins_model.eval()  # Set to evaluation mode
         self.num_classes = num_classes
+
+        # Freeze the parameters of Barlow Twins model
+        for param in self.barlow_twins_model.parameters():
+            param.requires_grad = False
 
         # Classifier adjusted for dynamic number of classes
         self.classifier = nn.Sequential(
@@ -38,32 +43,38 @@ class Classifier(pl.LightningModule):
         self.save_hyperparameters()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.classifier(x).squeeze(dim=1)
+        sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
+        return self.classifier(sample_repr).squeeze(dim=1)
 
     def training_step(self, batch: List[torch.Tensor], batch_idx: int) -> torch.Tensor:
-        sample_repr, labels = batch
+        sample_subset1, sample_subset2, labels = batch
 
-        output = self(sample_repr)
+        output1 = self(sample_subset1)
+        output2 = self(sample_subset2)
         
         # Classification loss
         if self.num_classes > 2:
-            class_loss = self.loss_fn(output, labels)
+            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         else:
             labels = labels.float()
-            class_loss = self.loss_fn(output, labels)
+            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('class_loss', class_loss)
 
         # Accuracy calculation
         if self.num_classes > 2:
-            pred = torch.argmax(output, dim=1)
+            pred1 = torch.argmax(output1, dim=1)
+            pred2 = torch.argmax(output2, dim=1)
         else:
-            pred = (torch.sigmoid(output) > 0.5).long()
+            pred1 = (torch.sigmoid(output1) > 0.5).long()
+            pred2 = (torch.sigmoid(output2) > 0.5).long()
             
-        accuracy = self.train_accuracy(pred, labels)
+        combined_preds = torch.cat((pred1, pred2), dim=0)
+        combined_labels = torch.cat((labels, labels), dim=0)
+        accuracy = self.train_accuracy(combined_preds, combined_labels)
         self.log('train_accuracy', accuracy, on_step=False, on_epoch=True)
 
         # Compute confusion matrix for additional metrics
-        conf_matrix = self.train_conf_matrix(pred, labels)
+        conf_matrix = self.train_conf_matrix(combined_preds, combined_labels)
         FP = conf_matrix[0][1]
         FN = conf_matrix[1][0]
         self.log('train_FP', FP, on_step=False, on_epoch=True)
@@ -72,21 +83,26 @@ class Classifier(pl.LightningModule):
         return class_loss
 
     def validation_step(self, batch: List[torch.Tensor], batch_idx: int):
-        sample_repr, labels = batch
+        sample_subset1, sample_subset2, labels = batch
 
-        output = self(sample_repr)
+        output1 = self(sample_subset1)
+        output2 = self(sample_subset2)
 
         # Classification loss
         if self.num_classes > 2:
-            class_loss = self.loss_fn(output, labels)
-            pred = torch.argmax(output, dim=1)
+            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
+            pred1 = torch.argmax(output1, dim=1)
+            pred2 = torch.argmax(output2, dim=1)
         else:
             labels = labels.float()
-            class_loss = self.loss_fn(output, labels)
-            pred = (torch.sigmoid(output) > 0.5).long()
+            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
+            pred1 = (torch.sigmoid(output1) > 0.5).long()
+            pred2 = (torch.sigmoid(output2) > 0.5).long()
 
-        # Accuracy calculation
-        accuracy = self.val_accuracy(pred, labels)
+        # Combining predictions and labels
+        combined_preds = torch.cat((pred1, pred2), dim=0)
+        combined_labels = torch.cat((labels, labels), dim=0)
+        accuracy = self.val_accuracy(combined_preds, combined_labels)
     
         # Log the combined accuracy
         self.log('val_accuracy', accuracy, on_step=False, on_epoch=True)
