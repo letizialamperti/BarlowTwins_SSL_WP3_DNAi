@@ -37,8 +37,8 @@ class SelfAttentionBarlowTwinsEmbedder(pl.LightningModule):
         sample_emb = self.out_mlp(sample_repr)  # B x sample_emb_dim
         return sample_emb
 
-    def training_step(self, batch: List[torch.Tensor], batch_idx: int) -> torch.Tensor:
-        sample_subset1, sample_subset2 = batch
+    def training_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], batch_idx: int) -> torch.Tensor:
+        sample_subset1, sample_subset2, labels = batch
         batch_size = sample_subset1.size(0)
 
         subset1_emb = self(sample_subset1)
