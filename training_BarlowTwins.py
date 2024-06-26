@@ -32,7 +32,7 @@ model = SelfAttentionBarlowTwinsEmbedder(token_emb_dim=args.token_emb_dim,
 checkpoint_callback = ModelCheckpoint(
     monitor='val_accuracy',
     dirpath='checkpoints',
-    filename='model-{epoch:02d}-{val_accuracy:.2f}',
+    filename='BT_model-{epoch:02d}',
     save_top_k=3,
     mode='max',
 )
