@@ -28,14 +28,20 @@ model = SelfAttentionBarlowTwinsEmbedder(token_emb_dim=args.token_emb_dim,
                                          lmbda=args.barlow_twins_lambda, 
                                          initial_learning_rate=args.initial_learning_rate)
 
+# Checkpoint directory
+checkpoint_dir = Path('checkpoints')
+checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
 # General checkpoint callback for best model saving
 checkpoint_callback = ModelCheckpoint(
     monitor='val_accuracy',
-    dirpath='checkpoints',
+    dirpath=checkpoint_dir,
     filename='BT_model-{epoch:02d}',
     save_top_k=3,
     mode='max',
 )
+
+print(f"Checkpoints will be saved in: {checkpoint_dir.resolve()}")
 
 # Setup logger and trainer
 wandb_logger = WandbLogger(project='ORDNA_Class', save_dir=Path("lightning_logs"), config=args, log_model=False)
