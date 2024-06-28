@@ -24,7 +24,7 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
                                    batch_size=args.batch_size)
 
 # Carica il modello Barlow Twins addestrato
-barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/model-epoch=00.ckpt")
+barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model-epoch=01.ckpt")
 
 # Crea il classificatore con il modello Barlow Twins congelato
 model = Classifier(barlow_twins_model=barlow_twins_model, sample_repr_dim=args.sample_repr_dim, num_classes=args.num_classes, initial_learning_rate=args.initial_learning_rate)
