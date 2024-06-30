@@ -7,6 +7,7 @@ from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataset  # Assicurati 
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
+import argparse
 
 def load_checkpoint(checkpoint_path, model_class, datamodule):
     model = model_class.load_from_checkpoint(checkpoint_path)
@@ -38,15 +39,27 @@ def test_model(model, dataloader):
     return all_preds, all_labels
 
 if __name__ == "__main__":
-    # Usa la stessa configurazione
-    args = get_args()
-    if args.arg_log:
-        write_config_file(args)
+    # Parsing command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--samples_dir', required=True, type=str, help='Directory of sample files')
+    parser.add_argument('--labels_file', required=True, type=str, help='Labels file path')
+    parser.add_argument('--sequence_length', required=True, type=int, help='Sequence length')
+    parser.add_argument('--num_classes', required=True, type=int, help='Number of classes')
+    parser.add_argument('--batch_size', default=64, type=int, help='Batch size')
+    parser.add_argument('--sample_subset_size', default=32, type=int, help='Sample subset size')
+    parser.add_argument('--token_emb_dim', default=128, type=int, help='Token embedding dimension')
+    parser.add_argument('--sample_repr_dim', default=128, type=int, help='Sample representation dimension')
+    parser.add_argument('--initial_learning_rate', default=1e-3, type=float, help='Initial learning rate')
+    parser.add_argument('--test_samples_dir', required=True, type=str, help='Directory of test sample files')
+    parser.add_argument('--checkpoint_path', required=True, type=str, help='Path to the classifier checkpoint')
+    parser.add_argument('--barlow_checkpoint_path', required=True, type=str, help='Path to the Barlow Twins checkpoint')
+
+    args = parser.parse_args()
 
     pl.seed_everything(args.seed)
 
     samples_dir = Path(args.samples_dir).resolve()
-    test_samples_dir = Path("/store/sdsc/sd29/letizia/test_sud_corse").resolve()  
+    test_samples_dir = Path(args.test_samples_dir).resolve()
     labels_file = Path(args.labels_file).resolve()
 
     # Creare il DataLoader per il set di test
@@ -62,9 +75,8 @@ if __name__ == "__main__":
                                  drop_last=False)
 
     # Carica il modello Classifier addestrato
-    checkpoint_path = "checkpoints_classifier/classifier-epoch=01-val_accuracy=1.00.ckpt"  # Aggiorna il percorso del checkpoint
-    barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model-epoch=01.ckpt")
-    model = Classifier.load_from_checkpoint(checkpoint_path, 
+    barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint(args.barlow_checkpoint_path)
+    model = Classifier.load_from_checkpoint(args.checkpoint_path, 
                                             barlow_twins_model=barlow_twins_model, 
                                             sample_repr_dim=args.sample_repr_dim, 
                                             num_classes=args.num_classes, 
