@@ -9,7 +9,7 @@ from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
 
 # Usa la stessa configurazione
-args = Config()
+args = get_args()
 if args.arg_log:
     write_config_file(args)
 
@@ -27,12 +27,19 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
 barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model-epoch=01.ckpt")
 
 # Crea il classificatore con il modello Barlow Twins congelato
-model = Classifier(barlow_twins_model=barlow_twins_model, sample_repr_dim=args.sample_repr_dim, num_classes=args.num_classes, initial_learning_rate=args.initial_learning_rate)
+model = Classifier(barlow_twins_model=barlow_twins_model, 
+                   sample_repr_dim=args.sample_repr_dim, 
+                   num_classes=args.num_classes, 
+                   initial_learning_rate=args.initial_learning_rate)
+
+# Checkpoint directory
+checkpoint_dir = Path('checkpoints_classifier')
+checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
 # General checkpoint callback for best model saving
 checkpoint_callback = ModelCheckpoint(
-    monitor='val_accuracy',
-    dirpath='checkpoints',
+    monitor='val_accuracy',  # Ensure this metric is logged in your model
+    dirpath=checkpoint_dir,
     filename='classifier-{epoch:02d}-{val_accuracy:.2f}',
     save_top_k=3,
     mode='max',
