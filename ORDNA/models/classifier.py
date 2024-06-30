@@ -3,6 +3,7 @@ import pytorch_lightning as pl
 from torch import nn
 from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix
+from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Import the Barlow Twins model
 
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5):
