@@ -6,7 +6,7 @@ from torchmetrics import Accuracy, ConfusionMatrix
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Import the Barlow Twins model
 
 class Classifier(pl.LightningModule):
-    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_emb_dim: int, num_classes: int, initial_learning_rate: float = 1e-5):
+    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5):
         super().__init__()
         self.save_hyperparameters(ignore=['barlow_twins_model'])  # Save hyperparameters, but ignore barlow_twins_model
         self.barlow_twins_model = barlow_twins_model.eval()  # Set to evaluation mode
@@ -18,7 +18,7 @@ class Classifier(pl.LightningModule):
 
         # Classifier adjusted for dynamic number of classes
         self.classifier = nn.Sequential(
-            nn.Linear(sample_emb_dim, 2048),
+            nn.Linear(sample_repr_dim, 2048),
             nn.BatchNorm1d(2048),
             nn.ReLU(),
             nn.Linear(2048, 1024),
@@ -43,9 +43,9 @@ class Classifier(pl.LightningModule):
             self.val_conf_matrix = ConfusionMatrix(task="binary")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        _, sample_emb = self.barlow_twins_model(x)  # Extract embedding using Barlow Twins
-        print(f"sample_emb shape: {sample_emb.shape}")  # Debugging: print the shape
-        return self.classifier(sample_emb).squeeze(dim=1)
+        sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
+        print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
+        return self.classifier(sample_repr).squeeze(dim=1)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
