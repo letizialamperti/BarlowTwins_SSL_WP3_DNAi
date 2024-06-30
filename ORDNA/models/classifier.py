@@ -47,7 +47,7 @@ class Classifier(pl.LightningModule):
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
         return self.classifier(sample_repr).squeeze(dim=1)
 
-    def training_step(self, batch: List[torch.Tensor], batch_idx: int) -> torch.Tensor:
+    def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
 
         output1 = self(sample_subset1)
@@ -83,7 +83,7 @@ class Classifier(pl.LightningModule):
 
         return class_loss
 
-    def validation_step(self, batch: List[torch.Tensor], batch_idx: int):
+    def validation_step(self, batch, batch_idx: int):
         sample_subset1, sample_subset2, labels = batch
 
         output1 = self(sample_subset1)
