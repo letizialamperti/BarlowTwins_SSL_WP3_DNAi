@@ -8,6 +8,7 @@ from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Import
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5):
         super().__init__()
+        self.save_hyperparameters(ignore=['barlow_twins_model'])  # Save hyperparameters, but ignore barlow_twins_model
         self.barlow_twins_model = barlow_twins_model.eval()  # Set to evaluation mode
         self.num_classes = num_classes
 
@@ -40,8 +41,6 @@ class Classifier(pl.LightningModule):
             self.val_accuracy = Accuracy(task="binary")
             self.train_conf_matrix = ConfusionMatrix(task="binary")
             self.val_conf_matrix = ConfusionMatrix(task="binary")
-
-        self.save_hyperparameters()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
@@ -105,5 +104,5 @@ class Classifier(pl.LightningModule):
         return class_loss
 
     def configure_optimizers(self):
-        optimizer = AdamW(self.parameters(), lr=self.initial_learning_rate)
+        optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate)
         return optimizer
