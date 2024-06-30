@@ -74,13 +74,6 @@ class Classifier(pl.LightningModule):
         accuracy = self.train_accuracy(combined_preds, combined_labels)
         self.log('train_accuracy', accuracy, on_step=False, on_epoch=True)
 
-        # Compute confusion matrix for additional metrics
-        conf_matrix = self.train_conf_matrix(combined_preds, combined_labels)
-        FP = conf_matrix[0][1]
-        FN = conf_matrix[1][0]
-        self.log('train_FP', FP, on_step=False, on_epoch=True)
-        self.log('train_FN', FN, on_step=False, on_epoch=True)
-
         return class_loss
 
     def validation_step(self, batch, batch_idx: int):
