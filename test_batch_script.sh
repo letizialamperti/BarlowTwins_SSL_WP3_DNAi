@@ -20,6 +20,6 @@ module load cray-python
 
 # Command to run the Python script
 echo "Starting the training process."
-srun -ul $HOME/miniconda3/envs/diaus_1/bin/python visualize_embeddings_class.py  
+srun -ul $HOME/miniconda3/envs/diaus_1/bin/python test_classifier.py  
 
 echo "Visualizing script completed successfully."
