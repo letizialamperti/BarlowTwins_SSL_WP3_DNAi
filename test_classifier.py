@@ -9,7 +9,7 @@ from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, precision_recall_fscore_support
 
 # Impostazioni
-CHECKPOINT_PATH = Path('checkpoints_classifier/ classifier-epoch=01-val_accuracy=1.00.ckpt')
+CHECKPOINT_PATH = Path('checkpoints_classifier/classifier-epoch=01-val_accuracy=1.00.ckpt')
 DATASET = 'sud_corse'
 SAMPLES_DIR = Path(f'/store/sdsc/sd29/letizia/tesy_sud_corse')
 TEST_SAMPLES_DIR = Path(f'/store/sdsc/sd29/letizia/tesy_sud_corse')  # Directory dei dati di test
