@@ -21,6 +21,8 @@ INITIAL_LEARNING_RATE = 1e-3
 BATCH_SIZE = 32
 BARLOW_CHECKPOINT_PATH = Path('checkpoints/BT_model-epoch=01.ckpt')
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 def load_checkpoint(checkpoint_path, model_class, datamodule):
     model = model_class.load_from_checkpoint(checkpoint_path)
     model.eval()
