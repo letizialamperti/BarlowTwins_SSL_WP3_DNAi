@@ -23,17 +23,23 @@ BARLOW_CHECKPOINT_PATH = Path('checkpoints/BT_model-epoch=01.ckpt')
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 def load_checkpoint(checkpoint_path, model_class, datamodule):
     model = model_class.load_from_checkpoint(checkpoint_path)
     model.eval()
     return model
 
-def test_model(model, dataloader):
+def test_model(model, dataloader, device):
+    model.to(device)
     all_preds = []
     all_labels = []
 
     for batch in dataloader:
         sample_subset1, sample_subset2, labels = batch
+        sample_subset1 = sample_subset1.to(device)
+        sample_subset2 = sample_subset2.to(device)
+        labels = labels.to(device)
+
         with torch.no_grad():
             output1 = model(sample_subset1)
             output2 = model(sample_subset2)
@@ -78,7 +84,7 @@ if __name__ == "__main__":
     model.eval()
 
     # Esegui il test
-    preds, labels = test_model(model, test_dataloader)
+    preds, labels = test_model(model, test_dataloader, device)
 
     # Calcola e stampa i risultati
     if NUM_CLASSES > 2:
