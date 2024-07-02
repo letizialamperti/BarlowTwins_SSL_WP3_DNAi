@@ -15,7 +15,7 @@ TEST_SAMPLES_DIR = Path(f'/store/sdsc/sd29/letizia/labels_binary_sud_corse_test.
 SEQUENCE_LENGTH = 300
 SAMPLE_SUBSET_SIZE = 500
 NUM_CLASSES = 2  # Adjust this based on the number of classes in your classifier
-LABELS_FILE = Path('label/label/labels_binary_sud_corse_test.csv')  # Path to the file containing labels
+LABELS_FILE = Path('label/labels_binary_sud_corse_test.csv')  # Path to the file containing labels
 INITIAL_LEARNING_RATE = 1e-3
 BATCH_SIZE = 32
 BARLOW_CHECKPOINT_PATH = Path('checkpoints/BT_model-epoch=01.ckpt')
