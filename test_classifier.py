@@ -11,7 +11,7 @@ from sklearn.metrics import accuracy_score, classification_report, confusion_mat
 # Impostazioni
 CHECKPOINT_PATH = Path('checkpoints_classifier/classifier-epoch=01-val_accuracy=1.00.ckpt')
 DATASET = 'sud_corse'
-TEST_SAMPLES_DIR = Path(f'/store/sdsc/sd29/letizia/labels_binary_sud_corse_test.csv')  # Directory test set 
+TEST_SAMPLES_DIR = Path(f'/store/sdsc/sd29/letizia/sud_corse_2')  # Directory test set 
 SEQUENCE_LENGTH = 300
 SAMPLE_SUBSET_SIZE = 500
 NUM_CLASSES = 2  # Adjust this based on the number of classes in your classifier
