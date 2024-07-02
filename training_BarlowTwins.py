@@ -34,11 +34,11 @@ checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
 # General checkpoint callback for best model saving
 checkpoint_callback = ModelCheckpoint(
-    monitor='barlow_loss',  # Monitor the correct metric
+    monitor='val_barlow_loss',
     dirpath=checkpoint_dir,
     filename='BT_model-{epoch:02d}',
     save_top_k=3,
-    mode='min',  # Because we want to minimize the loss
+    mode='min',
 )
 
 print(f"Checkpoints will be saved in: {checkpoint_dir.resolve()}")
