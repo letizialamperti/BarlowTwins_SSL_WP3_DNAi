@@ -56,9 +56,34 @@ class SelfAttentionBarlowTwinsEmbedder(pl.LightningModule):
         off_diag_loss = torch.sum(torch.square(off_diag)) * self.lmbda
 
         barlow_loss = diag_loss + off_diag_loss
-        self.log('barlow_loss', barlow_loss)
-        self.log('diag_loss', diag_loss)
-        self.log('off_diag_loss', off_diag_loss)
+        self.log('train_barlow_loss', barlow_loss)
+        self.log('train_diag_loss', diag_loss)
+        self.log('train_off_diag_loss', off_diag_loss)
+
+        return barlow_loss
+
+    def validation_step(self, batch: Tuple[torch.Tensor, torch.Tensor, torch.Tensor], batch_idx: int):
+        sample_subset1, sample_subset2, labels = batch
+        batch_size = sample_subset1.size(0)
+
+        subset1_emb = self(sample_subset1)
+        subset2_emb = self(sample_subset2)
+
+        # Barlow Twins loss
+        subset1_emb_norm = (subset1_emb - torch.mean(subset1_emb, dim=0)) / torch.std(subset1_emb, dim=0)
+        subset2_emb_norm = (subset2_emb - torch.mean(subset2_emb, dim=0)) / torch.std(subset2_emb, dim=0)
+
+        cross_corr_mat = torch.matmul(torch.transpose(subset1_emb_norm, 0, 1), subset2_emb_norm) / batch_size
+        diag = torch.diag(cross_corr_mat)
+        diag_loss = torch.sum(torch.square(diag - torch.ones_like(diag)))
+
+        off_diag = cross_corr_mat - torch.diag(diag)
+        off_diag_loss = torch.sum(torch.square(off_diag)) * self.lmbda
+
+        barlow_loss = diag_loss + off_diag_loss
+        self.log('val_barlow_loss', barlow_loss)
+        self.log('val_diag_loss', diag_loss)
+        self.log('val_off_diag_loss', off_diag_loss)
 
         return barlow_loss
 
