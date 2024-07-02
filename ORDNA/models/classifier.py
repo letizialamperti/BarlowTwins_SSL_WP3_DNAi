@@ -18,10 +18,7 @@ class Classifier(pl.LightningModule):
 
         # Classifier adjusted for dynamic number of classes
         self.classifier = nn.Sequential(
-            nn.Linear(sample_repr_dim, 2048),
-            nn.BatchNorm1d(2048),
-            nn.ReLU(),
-            nn.Linear(2048, 1024),
+            nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
             nn.Linear(1024, 1 if num_classes == 2 else num_classes)  # Output 1 if binary classification
