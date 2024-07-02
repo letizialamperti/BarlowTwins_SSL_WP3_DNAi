@@ -34,9 +34,7 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
             indices = list(range(dataset_size))
             split = int(np.floor(self.val_split * dataset_size))
 
-            # Mescola gli indici
-            np.random.shuffle(indices)
-
+            # Non mescolare gli indici
             train_indices, val_indices = indices[split:], indices[:split]
 
             # Crea i subset per training e validation
