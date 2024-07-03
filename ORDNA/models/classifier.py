@@ -1,9 +1,28 @@
 import torch
+import torch.nn.functional as F
 import pytorch_lightning as pl
 from torch import nn
 from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Import the Barlow Twins model
+
+class OrdinalCrossEntropyLoss(nn.Module):
+    def __init__(self, num_classes):
+        super(OrdinalCrossEntropyLoss, self).__init__()
+        self.num_classes = num_classes
+
+    def forward(self, logits, labels):
+        logits = logits.view(-1, self.num_classes - 1)
+        labels = labels.view(-1, 1)
+
+        cum_probs = torch.sigmoid(logits)
+        cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
+        prob = cum_probs[:, :-1] - cum_probs[:, 1:]
+
+        one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1)
+        loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1).mean()
+
+        return loss
 
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5):
@@ -21,11 +40,11 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Linear(1024, 1 if num_classes == 2 else num_classes)  # Output 1 if binary classification
+            nn.Linear(1024, self.num_classes - 1)  # Output self.num_classes - 1 for ordinal classification
         )
         
         # Loss function
-        self.loss_fn = nn.CrossEntropyLoss() if num_classes > 2 else nn.BCEWithLogitsLoss()
+        self.loss_fn = OrdinalCrossEntropyLoss(num_classes) if num_classes > 2 else nn.BCEWithLogitsLoss()
 
         # Metrics
         if num_classes > 2:
@@ -41,8 +60,7 @@ class Classifier(pl.LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
-        print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
-        return self.classifier(sample_repr).squeeze(dim=1)
+        return self.classifier(sample_repr)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
@@ -51,11 +69,7 @@ class Classifier(pl.LightningModule):
         output2 = self(sample_subset2)
         
         # Classification loss
-        if self.num_classes > 2:
-            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-        else:
-            labels = labels.float()
-            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
+        class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('class_loss', class_loss)
 
         # Accuracy calculation
@@ -80,17 +94,16 @@ class Classifier(pl.LightningModule):
         output2 = self(sample_subset2)
 
         # Classification loss
+        class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
+        
+        # Combining predictions and labels
         if self.num_classes > 2:
-            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
             pred1 = torch.argmax(output1, dim=1)
             pred2 = torch.argmax(output2, dim=1)
         else:
-            labels = labels.float()
-            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
             pred1 = (torch.sigmoid(output1) > 0.5).long()
             pred2 = (torch.sigmoid(output2) > 0.5).long()
 
-        # Combining predictions and labels
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.val_accuracy(combined_preds, combined_labels)
