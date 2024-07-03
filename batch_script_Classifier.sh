@@ -20,7 +20,7 @@ source activate diaus_1
 
 # Define dataset and labels path
 DATASET_DIR="/store/sdsc/sd29/letizia/sud_corse"
-LABELS_FILE="label/labels_5_levels_Sud_corse.csv"
+LABELS_FILE="label/ordinal_label_Sud_Corse.csv"
 
 # Command to run the Python script
 echo "Starting the training process."
