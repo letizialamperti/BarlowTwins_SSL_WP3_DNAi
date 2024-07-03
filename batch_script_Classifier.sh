@@ -20,7 +20,7 @@ source activate diaus_1
 
 # Define dataset and labels path
 DATASET_DIR="/store/sdsc/sd29/letizia/sud_corse"
-LABELS_FILE="label/labels_numeric_binary_MPA_Sud_corse.csv"
+LABELS_FILE="label/labels_5_levels_Sud_corse.csv"
 
 # Command to run the Python script
 echo "Starting the training process."
@@ -31,12 +31,12 @@ srun -ul $HOME/miniconda3/envs/diaus_1/bin/python training_Classifier.py \
     --embedder_type barlow_twins \
     --sequence_length 300 \
     --sample_subset_size 500 \
-    --num_classes 2 \
+    --num_classes 5 \
     --batch_size 32 \
     --token_emb_dim 8 \
     --sample_repr_dim 128 \
     --sample_emb_dim 64 \
     --initial_learning_rate 1e-3 \
-    --max_epochs 7
+    --max_epochs 2
 
 echo "Training completed successfully."
