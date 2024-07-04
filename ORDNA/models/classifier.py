@@ -1,9 +1,5 @@
 import torch
-import pytorch_lightning as pl
-from torch import nn
-from torch.optim import AdamW
-from torchmetrics import Accuracy, ConfusionMatrix
-from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Import the Barlow Twins model
+import torch.nn as nn
 
 class WeightedOrdinalCrossEntropyLoss(nn.Module):
     def __init__(self, num_classes):
@@ -11,27 +7,35 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
         self.num_classes = num_classes
 
     def forward(self, logits, labels):
+        # Ensure labels are on the same device as logits
         logits = logits.view(-1, self.num_classes - 1)
-        labels = labels.view(-1, 1).to(logits.device)  # Ensure labels are on the same device as logits
-
+        labels = labels.view(-1, 1).to(logits.device)
+        
         # Compute the cumulative probabilities
         cum_probs = torch.sigmoid(logits)
         cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
         prob = cum_probs[:, :-1] - cum_probs[:, 1:]
 
-        # Compute weights based on the presence of labels in the batch
+        # Compute the weights based on class distribution
         class_counts = torch.bincount(labels.view(-1), minlength=self.num_classes).float()
-        class_counts[class_counts == 0] = 1  # Avoid division by zero
-        weights = 1.0 / class_counts
-        weights = weights[labels.view(-1)]
+        weights = class_counts / class_counts.sum()
 
-        one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1)
-        loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1)
+        # Avoid division by zero
+        weights = torch.where(weights == 0, torch.tensor(1.0, device=weights.device), weights)
+        inv_weights = 1.0 / weights
+        inv_weights = inv_weights / inv_weights.sum()
 
-        # Apply weights to the loss
-        loss = (loss * weights).mean()
+        one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1).float()
+        loss = - (inv_weights[labels] * (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9))).sum(dim=1).mean()
 
         return loss
+
+# Update Classifier class to use the new loss function
+
+import pytorch_lightning as pl
+from torch.optim import AdamW
+from torchmetrics import Accuracy, ConfusionMatrix
+from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Import the Barlow Twins model
 
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5):
@@ -49,14 +53,11 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Linear(1024, num_classes - 1)  # Output num_classes - 1 for ordinal classification
+            nn.Linear(1024, 1 if num_classes == 2 else num_classes)  # Output 1 if binary classification
         )
         
-        # Loss function
-        if num_classes > 2:
-            self.loss_fn = WeightedOrdinalCrossEntropyLoss(num_classes=num_classes)
-        else:
-            self.loss_fn = nn.BCEWithLogitsLoss()
+        # Use the new ordinal loss function
+        self.loss_fn = WeightedOrdinalCrossEntropyLoss(num_classes=self.num_classes)
 
         # Metrics
         if num_classes > 2:
@@ -81,11 +82,7 @@ class Classifier(pl.LightningModule):
         output2 = self(sample_subset2)
         
         # Classification loss
-        if self.num_classes > 2:
-            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-        else:
-            labels = labels.float()
-            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
+        class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('class_loss', class_loss)
 
         # Accuracy calculation
@@ -110,13 +107,13 @@ class Classifier(pl.LightningModule):
         output2 = self(sample_subset2)
 
         # Classification loss
+        class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
+
+        # Accuracy calculation
         if self.num_classes > 2:
-            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
             pred1 = torch.argmax(output1, dim=1)
             pred2 = torch.argmax(output2, dim=1)
         else:
-            labels = labels.float()
-            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
             pred1 = (torch.sigmoid(output1) > 0.5).long()
             pred2 = (torch.sigmoid(output2) > 0.5).long()
 
