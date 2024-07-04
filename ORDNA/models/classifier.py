@@ -12,7 +12,7 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
 
     def forward(self, logits, labels):
         logits = logits.view(-1, self.num_classes - 1)
-        labels = labels.view(-1, 1)
+        labels = labels.view(-1, 1).to(logits.device)  # Ensure labels are on the same device as logits
 
         # Compute the cumulative probabilities
         cum_probs = torch.sigmoid(logits)
@@ -21,7 +21,8 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
 
         # Compute weights based on the presence of labels in the batch
         class_counts = torch.bincount(labels.view(-1), minlength=self.num_classes).float()
-        weights = 1.0 / (class_counts + 1e-9)
+        class_counts[class_counts == 0] = 1  # Avoid division by zero
+        weights = 1.0 / class_counts
         weights = weights[labels.view(-1)]
 
         one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1)
