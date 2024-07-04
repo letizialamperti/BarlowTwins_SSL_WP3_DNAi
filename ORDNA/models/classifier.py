@@ -72,6 +72,7 @@ class Classifier(pl.LightningModule):
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
         print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
         logits = self.classifier(sample_repr).squeeze(dim=1)
+        print(f"logits shape: {logits.shape}")  # Debugging: print the shape
         return logits
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
