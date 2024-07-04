@@ -15,7 +15,7 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
         print(f"logits shape: {logits.shape}")
         print(f"labels shape: {labels.shape}")
 
-        logits = logits.view(-1, self.num_classes - 1)
+        logits = logits.view(-1, self.num_classes - 1).to(labels.device)
         labels = labels.view(-1, 1).to(logits.device)
 
         # Ensure labels are within valid range
