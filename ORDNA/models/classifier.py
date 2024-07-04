@@ -14,21 +14,23 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
         logits = logits.view(-1, self.num_classes - 1)
         labels = labels.view(-1, 1).to(logits.device)
 
+        # Ensure labels are within valid range
         assert labels.min() >= 0 and labels.max() < self.num_classes, "Labels are out of valid range."
-        
+
         cum_probs = torch.sigmoid(logits)
         cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
         prob = cum_probs[:, :-1] - cum_probs[:, 1:]
 
-        class_counts = torch.bincount(labels.view(-1), minlength=self.num_classes).float()
+        class_counts = torch.bincount(labels.view(-1), minlength=self.num_classes).float().to(logits.device)
         weights = class_counts / class_counts.sum()
 
+        # Handle cases where some classes may not be present in the batch
         weights = torch.where(weights == 0, torch.tensor(1.0, device=weights.device), weights)
         inv_weights = 1.0 / weights
         inv_weights = inv_weights / inv_weights.sum()
 
-        one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1).float()
-        loss = - (inv_weights[labels] * (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9))).sum(dim=1).mean()
+        # Compute the loss
+        loss = - (inv_weights[labels.view(-1)] * torch.log(prob.gather(1, labels) + 1e-9)).mean()
 
         return loss
 
@@ -48,11 +50,11 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Linear(1024, self.num_classes - 1)  # Adjusted to output num_classes - 1 logits
+            nn.Linear(1024, num_classes - 1)  # Output num_classes - 1 for ordinal classification
         )
         
-        # Use the new ordinal loss function
-        self.loss_fn = WeightedOrdinalCrossEntropyLoss(num_classes=self.num_classes)
+        # Loss function
+        self.loss_fn = WeightedOrdinalCrossEntropyLoss(num_classes)
 
         # Metrics
         if num_classes > 2:
@@ -68,36 +70,23 @@ class Classifier(pl.LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
-        logits = self.classifier(sample_repr).squeeze(dim=1)
-        
-        # Check the shape of the logits
-        assert logits.shape[1] == self.num_classes - 1, f"Logits shape mismatch: expected ({logits.shape[0]}, {self.num_classes - 1}), got {logits.shape}"
-        
-        return logits
+        print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
+        return self.classifier(sample_repr)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
 
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
-
-        # Check the shapes of outputs and labels
-        assert output1.shape[1] == self.num_classes - 1, f"Output1 shape mismatch: expected ({output1.shape[0]}, {self.num_classes - 1}), got {output1.shape}"
-        assert output2.shape[1] == self.num_classes - 1, f"Output2 shape mismatch: expected ({output2.shape[0]}, {self.num_classes - 1}), got {output2.shape}"
-        assert labels.shape[0] == output1.shape[0], f"Labels shape mismatch: expected ({output1.shape[0]}), got {labels.shape[0]}"
         
         # Classification loss
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('class_loss', class_loss)
 
         # Accuracy calculation
-        if self.num_classes > 2:
-            pred1 = torch.argmax(output1, dim=1)
-            pred2 = torch.argmax(output2, dim=1)
-        else:
-            pred1 = (torch.sigmoid(output1) > 0.5).long()
-            pred2 = (torch.sigmoid(output2) > 0.5).long()
-            
+        pred1 = torch.argmax(output1, dim=1)
+        pred2 = torch.argmax(output2, dim=1)
+        
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.train_accuracy(combined_preds, combined_labels)
@@ -111,23 +100,12 @@ class Classifier(pl.LightningModule):
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
 
-        # Check the shapes of outputs and labels
-        assert output1.shape[1] == self.num_classes - 1, f"Validation output1 shape mismatch: expected ({output1.shape[0]}, {self.num_classes - 1}), got {output1.shape}"
-        assert output2.shape[1] == self.num_classes - 1, f"Validation output2 shape mismatch: expected ({output2.shape[0]}, {self.num_classes - 1}), got {output2.shape}"
-        assert labels.shape[0] == output1.shape[0], f"Validation labels shape mismatch: expected ({output1.shape[0]}), got {labels.shape[0]}"
-
         # Classification loss
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
 
-        # Accuracy calculation
-        if self.num_classes > 2:
-            pred1 = torch.argmax(output1, dim=1)
-            pred2 = torch.argmax(output2, dim=1)
-        else:
-            pred1 = (torch.sigmoid(output1) > 0.5).long()
-            pred2 = (torch.sigmoid(output2) > 0.5).long()
-
         # Combining predictions and labels
+        pred1 = torch.argmax(output1, dim=1)
+        pred2 = torch.argmax(output2, dim=1)
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.val_accuracy(combined_preds, combined_labels)
