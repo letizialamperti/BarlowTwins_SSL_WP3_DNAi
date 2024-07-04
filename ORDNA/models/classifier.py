@@ -11,23 +11,18 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
         self.num_classes = num_classes
 
     def forward(self, logits, labels):
-        # Ensure logits and labels are on the same device
         logits = logits.view(-1, self.num_classes - 1)
         labels = labels.view(-1, 1).to(logits.device)
-        
-        # Check if labels are within valid range
+
         assert labels.min() >= 0 and labels.max() < self.num_classes, "Labels are out of valid range."
         
-        # Compute the cumulative probabilities
         cum_probs = torch.sigmoid(logits)
         cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
         prob = cum_probs[:, :-1] - cum_probs[:, 1:]
 
-        # Compute the weights based on class distribution
         class_counts = torch.bincount(labels.view(-1), minlength=self.num_classes).float()
         weights = class_counts / class_counts.sum()
 
-        # Avoid division by zero
         weights = torch.where(weights == 0, torch.tensor(1.0, device=weights.device), weights)
         inv_weights = 1.0 / weights
         inv_weights = inv_weights / inv_weights.sum()
@@ -73,13 +68,23 @@ class Classifier(pl.LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
-        return self.classifier(sample_repr).squeeze(dim=1)
+        logits = self.classifier(sample_repr).squeeze(dim=1)
+        
+        # Check the shape of the logits
+        assert logits.shape[1] == self.num_classes - 1, f"Logits shape mismatch: expected ({logits.shape[0]}, {self.num_classes - 1}), got {logits.shape}"
+        
+        return logits
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
 
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
+
+        # Check the shapes of outputs and labels
+        assert output1.shape[1] == self.num_classes - 1, f"Output1 shape mismatch: expected ({output1.shape[0]}, {self.num_classes - 1}), got {output1.shape}"
+        assert output2.shape[1] == self.num_classes - 1, f"Output2 shape mismatch: expected ({output2.shape[0]}, {self.num_classes - 1}), got {output2.shape}"
+        assert labels.shape[0] == output1.shape[0], f"Labels shape mismatch: expected ({output1.shape[0]}), got {labels.shape[0]}"
         
         # Classification loss
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
@@ -105,6 +110,11 @@ class Classifier(pl.LightningModule):
 
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
+
+        # Check the shapes of outputs and labels
+        assert output1.shape[1] == self.num_classes - 1, f"Validation output1 shape mismatch: expected ({output1.shape[0]}, {self.num_classes - 1}), got {output1.shape}"
+        assert output2.shape[1] == self.num_classes - 1, f"Validation output2 shape mismatch: expected ({output2.shape[0]}, {self.num_classes - 1}), got {output2.shape}"
+        assert labels.shape[0] == output1.shape[0], f"Validation labels shape mismatch: expected ({output1.shape[0]}), got {labels.shape[0]}"
 
         # Classification loss
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
