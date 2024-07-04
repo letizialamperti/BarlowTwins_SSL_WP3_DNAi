@@ -11,6 +11,9 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
         logits = logits.view(-1, self.num_classes - 1)
         labels = labels.view(-1, 1).to(logits.device)
         
+        # Check if labels are within valid range
+        assert labels.min() >= 0 and labels.max() < self.num_classes, "Labels are out of valid range."
+        
         # Compute the cumulative probabilities
         cum_probs = torch.sigmoid(logits)
         cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
