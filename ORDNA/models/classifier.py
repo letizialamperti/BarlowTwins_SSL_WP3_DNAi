@@ -1,5 +1,9 @@
 import torch
-import torch.nn as nn
+import pytorch_lightning as pl
+from torch import nn
+from torch.optim import AdamW
+from torchmetrics import Accuracy, ConfusionMatrix
+from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Import the Barlow Twins model
 
 class WeightedOrdinalCrossEntropyLoss(nn.Module):
     def __init__(self, num_classes):
@@ -7,7 +11,7 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
         self.num_classes = num_classes
 
     def forward(self, logits, labels):
-        # Ensure labels are on the same device as logits
+        # Ensure logits and labels are on the same device
         logits = logits.view(-1, self.num_classes - 1)
         labels = labels.view(-1, 1).to(logits.device)
         
@@ -33,13 +37,6 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
 
         return loss
 
-# Update Classifier class to use the new loss function
-
-import pytorch_lightning as pl
-from torch.optim import AdamW
-from torchmetrics import Accuracy, ConfusionMatrix
-from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Import the Barlow Twins model
-
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5):
         super().__init__()
@@ -56,7 +53,7 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Linear(1024, 1 if num_classes == 2 else num_classes)  # Output 1 if binary classification
+            nn.Linear(1024, self.num_classes - 1)  # Adjusted to output num_classes - 1 logits
         )
         
         # Use the new ordinal loss function
