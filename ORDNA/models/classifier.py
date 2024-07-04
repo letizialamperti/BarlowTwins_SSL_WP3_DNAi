@@ -11,6 +11,10 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
         self.num_classes = num_classes
 
     def forward(self, logits, labels):
+        # Debugging: print shapes
+        print(f"logits shape: {logits.shape}")
+        print(f"labels shape: {labels.shape}")
+
         logits = logits.view(-1, self.num_classes - 1)
         labels = labels.view(-1, 1).to(logits.device)
 
@@ -71,10 +75,13 @@ class Classifier(pl.LightningModule):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
         print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
-        return self.classifier(sample_repr)
+        logits = self.classifier(sample_repr)
+        print(f"logits shape: {logits.shape}")  # Debugging: print the shape
+        return logits
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
+        print(f"labels shape before loss: {labels.shape}")  # Debugging: print the shape
 
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
@@ -96,6 +103,7 @@ class Classifier(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx: int):
         sample_subset1, sample_subset2, labels = batch
+        print(f"validation labels shape before loss: {labels.shape}")  # Debugging: print the shape
 
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
