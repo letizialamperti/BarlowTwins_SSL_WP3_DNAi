@@ -19,9 +19,9 @@ class WeightedOrdinalCrossEntropyLoss(nn.Module):
         cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
         prob = cum_probs[:, :-1] - cum_probs[:, 1:]
 
-        # Compute weights
-        class_counts = torch.bincount(labels.view(-1), minlength=self.num_classes)
-        weights = 1.0 / (class_counts.float() + 1e-9)
+        # Compute weights based on the presence of labels in the batch
+        class_counts = torch.bincount(labels.view(-1), minlength=self.num_classes).float()
+        weights = 1.0 / (class_counts + 1e-9)
         weights = weights[labels.view(-1)]
 
         one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1)
@@ -71,7 +71,6 @@ class Classifier(pl.LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
-        print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
         return self.classifier(sample_repr).squeeze(dim=1)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
