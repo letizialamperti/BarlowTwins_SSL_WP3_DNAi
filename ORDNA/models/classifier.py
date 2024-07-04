@@ -1,36 +1,27 @@
 import torch
+import torch.nn as nn
 import pytorch_lightning as pl
-from torch import nn
 from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Import the Barlow Twins model
 
-class WeightedOrdinalCrossEntropyLoss(nn.Module):
+class OrdinalCrossEntropyLoss(nn.Module):
     def __init__(self, num_classes):
-        super(WeightedOrdinalCrossEntropyLoss, self).__init__()
+        super(OrdinalCrossEntropyLoss, self).__init__()
         self.num_classes = num_classes
 
     def forward(self, logits, labels):
-        logits = logits.view(-1, self.num_classes - 1).to(labels.device)
-        labels = labels.view(-1, 1).to(logits.device)
-
-        # Ensure labels are within valid range
-        assert labels.min() >= 0 and labels.max() < self.num_classes, f"Labels are out of valid range: {labels}"
+        # Stampa di debug per logits e labels
+        print(f"logits shape: {logits.shape}, labels shape: {labels.shape}")
+        logits = logits.view(-1, self.num_classes - 1)
+        labels = labels.view(-1, 1)
 
         cum_probs = torch.sigmoid(logits)
         cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
         prob = cum_probs[:, :-1] - cum_probs[:, 1:]
 
-        class_counts = torch.bincount(labels.view(-1), minlength=self.num_classes).float().to(logits.device)
-        weights = class_counts / class_counts.sum()
-
-        # Handle cases where some classes may not be present in the batch
-        weights = torch.where(weights == 0, torch.tensor(1.0, device=weights.device), weights)
-        inv_weights = 1.0 / weights
-        inv_weights = inv_weights / inv_weights.sum()
-
-        # Compute the loss
-        loss = - (inv_weights[labels.view(-1)] * torch.log(prob.gather(1, labels) + 1e-9)).mean()
+        one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1)
+        loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1).mean()
 
         return loss
 
@@ -50,11 +41,11 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Linear(1024, 1 if num_classes == 2 else num_classes - 1)  # Output 1 if binary classification
+            nn.Linear(1024, 1 if num_classes == 2 else num_classes - 1)  # Output 1 if binary classification, num_classes - 1 otherwise
         )
         
         # Loss function
-        self.loss_fn = WeightedOrdinalCrossEntropyLoss(num_classes=num_classes)
+        self.loss_fn = OrdinalCrossEntropyLoss(num_classes=self.num_classes) if num_classes > 2 else nn.BCEWithLogitsLoss()
 
         # Metrics
         if num_classes > 2:
@@ -71,21 +62,21 @@ class Classifier(pl.LightningModule):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
         print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
-        logits = self.classifier(sample_repr).squeeze(dim=1)
-        print(f"logits shape: {logits.shape}")  # Debugging: print the shape
-        return logits
+        return self.classifier(sample_repr).squeeze(dim=1)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
 
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
-
-        print(f"labels shape before loss: {labels.shape}")
-        print(f"logits shape: {output1.shape}")
-
+        
         # Classification loss
-        class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
+        if self.num_classes > 2:
+            print(f"labels shape before loss: {labels.shape}")
+            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
+        else:
+            labels = labels.float()
+            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('class_loss', class_loss)
 
         # Accuracy calculation
@@ -95,7 +86,7 @@ class Classifier(pl.LightningModule):
         else:
             pred1 = (torch.sigmoid(output1) > 0.5).long()
             pred2 = (torch.sigmoid(output2) > 0.5).long()
-
+            
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.train_accuracy(combined_preds, combined_labels)
@@ -109,20 +100,19 @@ class Classifier(pl.LightningModule):
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
 
-        print(f"validation labels shape before loss: {labels.shape}")
-        print(f"logits shape: {output1.shape}")
-
         # Classification loss
-        class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-
-        # Combining predictions and labels
         if self.num_classes > 2:
+            print(f"validation labels shape before loss: {labels.shape}")
+            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
             pred1 = torch.argmax(output1, dim=1)
             pred2 = torch.argmax(output2, dim=1)
         else:
+            labels = labels.float()
+            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
             pred1 = (torch.sigmoid(output1) > 0.5).long()
             pred2 = (torch.sigmoid(output2) > 0.5).long()
 
+        # Combining predictions and labels
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.val_accuracy(combined_preds, combined_labels)
@@ -136,3 +126,20 @@ class Classifier(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate)
         return optimizer
+
+if __name__ == "__main__":
+    import pandas as pd
+    from pathlib import Path
+
+    # Load dataset and labels
+    dataset_dir = Path('/store/sdsc/sd29/letizia/sud_corse')
+    labels_file = Path('ordinal_label_Sud_Corse.csv')
+    labels_df = pd.read_csv(labels_file)
+    print(labels_df.head())
+
+    # Ensure labels are in the range [0, num_classes-1]
+    num_classes = 4
+    assert labels_df['protection'].min() >= 0 and labels_df['protection'].max() < num_classes, \
+        "Labels are not in the expected range"
+
+    # Further code for training...
