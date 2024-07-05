@@ -74,7 +74,7 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Linear(1024, num_classes - 1)  # Output num_classes - 1
+            nn.Linear(1024, num_classes)  # Output num_classes
         )
         
         # Loss function
@@ -99,6 +99,10 @@ class Classifier(pl.LightningModule):
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
+
+        # Ensure labels are within the correct range
+        if torch.any(labels >= self.num_classes):
+            raise ValueError("Labels out of range")
 
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
@@ -125,6 +129,10 @@ class Classifier(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx: int):
         sample_subset1, sample_subset2, labels = batch
+
+        # Ensure labels are within the correct range
+        if torch.any(labels >= self.num_classes):
+            raise ValueError("Labels out of range")
 
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
