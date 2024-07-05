@@ -130,3 +130,4 @@ class Classifier(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate)
         return optimizer
+
