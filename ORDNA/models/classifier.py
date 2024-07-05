@@ -1,11 +1,9 @@
 import torch
-import torch.nn as nn
 import pytorch_lightning as pl
+from torch import nn
 from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Import the Barlow Twins model
-import pandas as pd
-from pathlib import Path
 
 class OrdinalCrossEntropyLoss(nn.Module):
     def __init__(self, num_classes):
@@ -13,23 +11,28 @@ class OrdinalCrossEntropyLoss(nn.Module):
         self.num_classes = num_classes
 
     def forward(self, logits, labels):
-        try:
-            # Stampa di debug per logits e labels
-            print(f"logits shape: {logits.shape}, labels shape: {labels.shape}")
-            logits = logits.view(-1, self.num_classes - 1)
-            labels = labels.view(-1, 1)
+        # Ensure logits and labels are on the same device
+        logits = logits.to(labels.device)
+        
+        # Debugging: Print shapes and values
+        print(f"Inside OrdinalCrossEntropyLoss - logits shape: {logits.shape}, labels shape: {labels.shape}")
+        print(f"Inside OrdinalCrossEntropyLoss - logits: {logits}")
+        print(f"Inside OrdinalCrossEntropyLoss - labels: {labels}")
 
-            cum_probs = torch.sigmoid(logits)
-            cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
-            prob = cum_probs[:, :-1] - cum_probs[:, 1:]
+        # Ensure logits and labels are within valid range
+        assert torch.all(labels >= 0) and torch.all(labels < self.num_classes), "Labels out of range"
 
-            one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1)
-            loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1).mean()
+        logits = logits.view(-1, self.num_classes - 1)
+        labels = labels.view(-1, 1)
 
-            return loss
-        except Exception as e:
-            print(f"Error in OrdinalCrossEntropyLoss forward pass: {e}")
-            raise e
+        cum_probs = torch.sigmoid(logits)
+        cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
+        prob = cum_probs[:, :-1] - cum_probs[:, 1:]
+
+        one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1)
+        loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1).mean()
+
+        return loss
 
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5):
@@ -47,11 +50,11 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Linear(1024, 1 if num_classes == 2 else num_classes - 1)  # Output 1 if binary classification, num_classes - 1 otherwise
+            nn.Linear(1024, 1 if num_classes == 2 else num_classes - 1)  # Output 1 if binary classification
         )
         
         # Loss function
-        self.loss_fn = OrdinalCrossEntropyLoss(num_classes=self.num_classes) if num_classes > 2 else nn.BCEWithLogitsLoss()
+        self.loss_fn = OrdinalCrossEntropyLoss(num_classes)
 
         # Metrics
         if num_classes > 2:
@@ -66,99 +69,64 @@ class Classifier(pl.LightningModule):
             self.val_conf_matrix = ConfusionMatrix(task="binary")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        try:
-            sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
-            print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
-            return self.classifier(sample_repr).squeeze(dim=1)
-        except Exception as e:
-            print(f"Error in forward pass: {e}")
-            raise e
+        sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
+        print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
+        return self.classifier(sample_repr).squeeze(dim=1)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
+        sample_subset1, sample_subset2, labels = batch
+
+        output1 = self(sample_subset1)
+        output2 = self(sample_subset2)
+
+        # Classification loss
+        labels = labels.to(self.device)
         try:
-            sample_subset1, sample_subset2, labels = batch
-
-            output1 = self(sample_subset1)
-            output2 = self(sample_subset2)
-            
-            # Classification loss
-            if self.num_classes > 2:
-                print(f"labels shape before loss: {labels.shape}")
-                class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-            else:
-                labels = labels.float()
-                class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-            self.log('class_loss', class_loss)
-
-            # Accuracy calculation
-            if self.num_classes > 2:
-                pred1 = torch.argmax(output1, dim=1)
-                pred2 = torch.argmax(output2, dim=1)
-            else:
-                pred1 = (torch.sigmoid(output1) > 0.5).long()
-                pred2 = (torch.sigmoid(output2) > 0.5).long()
-                
-            combined_preds = torch.cat((pred1, pred2), dim=0)
-            combined_labels = torch.cat((labels, labels), dim=0)
-            accuracy = self.train_accuracy(combined_preds, combined_labels)
-            self.log('train_accuracy', accuracy, on_step=False, on_epoch=True)
-
-            return class_loss
+            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         except Exception as e:
-            print(f"Error in training step: {e}")
+            print(f"Error in OrdinalCrossEntropyLoss forward pass: {e}")
+            print(f"logits shape: {output1.shape}, labels shape: {labels.shape}")
             raise e
+        self.log('class_loss', class_loss)
+
+        # Accuracy calculation
+        pred1 = torch.argmax(output1, dim=1)
+        pred2 = torch.argmax(output2, dim=1)
+        combined_preds = torch.cat((pred1, pred2), dim=0)
+        combined_labels = torch.cat((labels, labels), dim=0)
+        accuracy = self.train_accuracy(combined_preds, combined_labels)
+        self.log('train_accuracy', accuracy, on_step=False, on_epoch=True)
+
+        return class_loss
 
     def validation_step(self, batch, batch_idx: int):
+        sample_subset1, sample_subset2, labels = batch
+
+        output1 = self(sample_subset1)
+        output2 = self(sample_subset2)
+
+        # Classification loss
+        labels = labels.to(self.device)
         try:
-            sample_subset1, sample_subset2, labels = batch
-
-            output1 = self(sample_subset1)
-            output2 = self(sample_subset2)
-
-            # Classification loss
-            if self.num_classes > 2:
-                print(f"validation labels shape before loss: {labels.shape}")
-                class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-                pred1 = torch.argmax(output1, dim=1)
-                pred2 = torch.argmax(output2, dim=1)
-            else:
-                labels = labels.float()
-                class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-                pred1 = (torch.sigmoid(output1) > 0.5).long()
-                pred2 = (torch.sigmoid(output2) > 0.5).long()
-
-            # Combining predictions and labels
-            combined_preds = torch.cat((pred1, pred2), dim=0)
-            combined_labels = torch.cat((labels, labels), dim=0)
-            accuracy = self.val_accuracy(combined_preds, combined_labels)
-        
-            # Log the combined accuracy
-            self.log('val_accuracy', accuracy, on_step=False, on_epoch=True)
-            self.log('val_loss', class_loss)
-
-            return class_loss
+            class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         except Exception as e:
-            print(f"Error in validation step: {e}")
+            print(f"Error in OrdinalCrossEntropyLoss forward pass: {e}")
+            print(f"logits shape: {output1.shape}, labels shape: {labels.shape}")
             raise e
+
+        # Combining predictions and labels
+        pred1 = torch.argmax(output1, dim=1)
+        pred2 = torch.argmax(output2, dim=1)
+        combined_preds = torch.cat((pred1, pred2), dim=0)
+        combined_labels = torch.cat((labels, labels), dim=0)
+        accuracy = self.val_accuracy(combined_preds, combined_labels)
+
+        # Log the combined accuracy
+        self.log('val_accuracy', accuracy, on_step=False, on_epoch=True)
+        self.log('val_loss', class_loss)
+
+        return class_loss
 
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate)
         return optimizer
-
-if __name__ == "__main__":
-    try:
-        # Load dataset and labels
-        dataset_dir = Path('/store/sdsc/sd29/letizia/sud_corse')
-        labels_file = Path('ordinal_label_Sud_Corse.csv')
-        labels_df = pd.read_csv(labels_file)
-        print(labels_df.head())
-
-        # Ensure labels are in the range [0, num_classes-1]
-        num_classes = 4
-        assert labels_df['protection'].min() >= 0 and labels_df['protection'].max() < num_classes, \
-            "Labels are not in the expected range"
-
-        # Further code for training...
-    except Exception as e:
-        print(f"Error in main: {e}")
-        raise e
