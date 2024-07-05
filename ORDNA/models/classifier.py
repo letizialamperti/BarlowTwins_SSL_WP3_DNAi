@@ -22,14 +22,19 @@ class OrdinalCrossEntropyLoss(nn.Module):
         # Ensure logits and labels are within valid range
         assert torch.all(labels >= 0) and torch.all(labels < self.num_classes), "Labels out of range"
 
+        # Adjust logits for ordinal loss
         logits = logits.view(-1, self.num_classes - 1)
         labels = labels.view(-1, 1)
 
+        # Compute cumulative probabilities
         cum_probs = torch.sigmoid(logits)
         cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
         prob = cum_probs[:, :-1] - cum_probs[:, 1:]
 
+        # Compute one-hot labels
         one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1)
+
+        # Compute loss
         loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1).mean()
 
         return loss
@@ -130,4 +135,3 @@ class Classifier(pl.LightningModule):
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate)
         return optimizer
-
