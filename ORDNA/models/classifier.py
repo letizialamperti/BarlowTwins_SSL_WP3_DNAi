@@ -1,6 +1,7 @@
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
 import pytorch_lightning as pl
-from torch import nn
 from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
@@ -13,18 +14,21 @@ class OrdinalCrossEntropyLoss(nn.Module):
     def forward(self, logits, labels):
         # Ensure logits and labels are on the same device
         logits = logits.to(labels.device)
-        
+
         # Debugging: Print shapes and values
         print(f"Inside OrdinalCrossEntropyLoss - logits shape: {logits.shape}, labels shape: {labels.shape}")
         print(f"Inside OrdinalCrossEntropyLoss - logits: {logits}")
         print(f"Inside OrdinalCrossEntropyLoss - labels: {labels}")
 
         # Ensure logits and labels are within valid range
-        assert torch.all(labels >= 0) and torch.all(labels < self.num_classes), "Labels out of range"
+        if not torch.all(labels >= 0) or not torch.all(labels < self.num_classes):
+            raise ValueError("Labels out of range")
         
         # Check for NaNs or Infs in logits
-        assert not torch.isnan(logits).any(), "Logits contain NaNs"
-        assert not torch.isinf(logits).any(), "Logits contain Infs"
+        if torch.isnan(logits).any():
+            raise ValueError("Logits contain NaNs")
+        if torch.isinf(logits).any():
+            raise ValueError("Logits contain Infs")
 
         # Adjust logits for ordinal loss
         logits = logits.view(-1, self.num_classes - 1)
@@ -59,7 +63,7 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Linear(1024, 1 if num_classes == 2 else num_classes - 1)  # Output 1 if binary classification
+            nn.Linear(1024, num_classes - 1)  # Output num_classes - 1
         )
         
         # Loss function
