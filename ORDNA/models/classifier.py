@@ -32,7 +32,7 @@ class OrdinalCrossEntropyLoss(nn.Module):
 
         # Adjust logits for ordinal loss
         logits = logits.view(-1, self.num_classes - 1)
-        labels = labels.view(-1, 1)
+        labels = labels.view(-1)
 
         # Compute cumulative probabilities
         cum_probs = torch.sigmoid(logits)
@@ -40,7 +40,7 @@ class OrdinalCrossEntropyLoss(nn.Module):
         prob = cum_probs[:, :-1] - cum_probs[:, 1:]
 
         # Compute one-hot labels
-        one_hot_labels = torch.zeros_like(prob).scatter(1, labels, 1)
+        one_hot_labels = torch.zeros_like(prob).scatter(1, labels.unsqueeze(1), 1)
 
         # Compute loss
         loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1).mean()
