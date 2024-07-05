@@ -34,13 +34,24 @@ class OrdinalCrossEntropyLoss(nn.Module):
         logits = logits.view(-1, self.num_classes - 1)
         labels = labels.view(-1)
 
+        # Debugging: Print adjusted logits and labels
+        print(f"Adjusted logits shape: {logits.shape}")
+        print(f"Adjusted labels shape: {labels.shape}")
+
         # Compute cumulative probabilities
         cum_probs = torch.sigmoid(logits)
+        print(f"cum_probs shape: {cum_probs.shape}")
         cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
         prob = cum_probs[:, :-1] - cum_probs[:, 1:]
+        print(f"prob shape: {prob.shape}")
+
+        # Ensure no values in `labels` are out of bounds
+        if torch.any(labels >= prob.size(1)):
+            raise ValueError("Labels out of bounds for the number of logits provided")
 
         # Compute one-hot labels
         one_hot_labels = torch.zeros_like(prob).scatter(1, labels.unsqueeze(1), 1)
+        print(f"one_hot_labels shape: {one_hot_labels.shape}")
 
         # Compute loss
         loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1).mean()
