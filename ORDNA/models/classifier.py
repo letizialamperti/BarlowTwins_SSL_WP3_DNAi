@@ -31,7 +31,7 @@ class OrdinalCrossEntropyLoss(nn.Module):
             raise ValueError("Logits contain Infs")
 
         # Adjust logits for ordinal loss
-        logits = logits.view(-1, self.num_classes - 1)
+        logits = logits.view(-1, self.num_classes)
         labels = labels.view(-1)
 
         # Debugging: Print adjusted logits and labels
