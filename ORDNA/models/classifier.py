@@ -55,7 +55,8 @@ class OrdinalCrossEntropyLoss(nn.Module):
 
         # Compute loss
         epsilon = 1e-9
-        loss = - (one_hot_labels * torch.log(prob + epsilon) + (1 - one_hot_labels) * torch.log(1 - prob + epsilon)).sum(dim=1).mean()
+        prob = torch.clamp(prob, min=epsilon, max=1-epsilon)  # Add epsilon to avoid log(0)
+        loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1).mean()
 
         return loss
 
