@@ -31,7 +31,7 @@ class OrdinalCrossEntropyLoss(nn.Module):
             raise ValueError("Logits contain Infs")
 
         # Adjust logits for ordinal loss
-        logits = logits.view(-1, self.num_classes - 1)
+        logits = logits.view(-1, self.num_classes)
         labels = labels.view(-1)
 
         # Debugging: Print adjusted logits and labels
@@ -97,7 +97,7 @@ class Classifier(pl.LightningModule):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
         print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
-        return self.classifier(sample_repr).squeeze(dim=1)
+        return self.classifier(sample_repr)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
