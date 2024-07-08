@@ -31,7 +31,7 @@ class OrdinalCrossEntropyLoss(nn.Module):
             raise ValueError("Logits contain Infs")
 
         # Adjust logits for ordinal loss
-        logits = logits.view(-1, self.num_classes)
+        logits = logits.view(-1, self.num_classes - 1)
         labels = labels.view(-1)
 
         # Debugging: Print adjusted logits and labels
@@ -54,7 +54,8 @@ class OrdinalCrossEntropyLoss(nn.Module):
         print(f"one_hot_labels shape: {one_hot_labels.shape}")
 
         # Compute loss
-        loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1).mean()
+        epsilon = 1e-9
+        loss = - (one_hot_labels * torch.log(prob + epsilon) + (1 - one_hot_labels) * torch.log(1 - prob + epsilon)).sum(dim=1).mean()
 
         return loss
 
