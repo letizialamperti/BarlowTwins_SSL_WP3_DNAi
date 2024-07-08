@@ -17,6 +17,9 @@ class OrdinalCrossEntropyLoss(nn.Module):
         # Ensure logits and labels are on the same device
         logits = logits.to(labels.device)
 
+        # Normalize logits
+        logits = (logits - logits.mean(dim=0, keepdim=True)) / (logits.std(dim=0, keepdim=True) + 1e-9)
+
         # Debugging: Print shapes and values
         print(f"Inside OrdinalCrossEntropyLoss - logits shape: {logits.shape}, labels shape: {labels.shape}")
         print(f"Inside OrdinalCrossEntropyLoss - logits: {logits}")
@@ -62,6 +65,12 @@ class OrdinalCrossEntropyLoss(nn.Module):
             loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1) * weights.squeeze()
         else:
             loss = - (one_hot_labels * torch.log(prob + 1e-9) + (1 - one_hot_labels) * torch.log(1 - prob + 1e-9)).sum(dim=1)
+
+        # Check for NaNs or Infs in loss
+        if torch.isnan(loss).any():
+            raise ValueError("Loss contains NaNs")
+        if torch.isinf(loss).any():
+            raise ValueError("Loss contains Infs")
 
         return loss.mean()
 
@@ -118,7 +127,7 @@ class Classifier(pl.LightningModule):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         sample_repr = self.barlow_twins_model.repr_module(x)  # Extract representation using Barlow Twins
         print(f"sample_repr shape: {sample_repr.shape}")  # Debugging: print the shape
-        return self.classifier(sample_repr).squeeze(dim=1)
+        return self.classifier(sample_repr)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
