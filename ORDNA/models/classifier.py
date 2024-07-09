@@ -107,7 +107,7 @@ class Classifier(pl.LightningModule):
         if torch.any(labels >= self.num_classes):
             raise ValueError("Labels out of range")
         output1 = self(sample_subset1)
-        output2 = self.sample_subset2)
+        output2 = self(sample_subset2)
         labels = labels.to(self.device)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         pred1 = torch.argmax(output1, dim=1)
