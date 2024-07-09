@@ -5,6 +5,10 @@ import pytorch_lightning as pl
 from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
+import matplotlib.pyplot as plt
+import seaborn as sns
+import numpy as np
+from pytorch_lightning.loggers import WandbLogger
 
 def calculate_class_weights(dataset, num_classes):
     labels = []
@@ -48,11 +52,11 @@ class Classifier(pl.LightningModule):
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
         self.classifier = nn.Sequential(
-            nn.Linear(sample_repr_dim, 1024),
-            nn.BatchNorm1d(1024),
+            nn.Linear(sample_repr_dim, 512),  # Reduce the number of units
+            nn.BatchNorm1d(512),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(1024, num_classes)
+            nn.Linear(512, num_classes)  # Reduce the number of units
         )
         self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device) if train_dataset is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
@@ -94,8 +98,6 @@ class Classifier(pl.LightningModule):
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.train_accuracy(combined_preds, combined_labels)
         self.log('train_accuracy', accuracy, on_step=False, on_epoch=True)
-        conf_matrix = self.train_conf_matrix(combined_preds, combined_labels)
-        self.log('train_conf_matrix', conf_matrix.float().mean(), on_step=False, on_epoch=True)
         precision = self.train_precision(combined_preds, combined_labels)
         self.log('train_precision', precision, on_step=False, on_epoch=True)
         recall = self.train_recall(combined_preds, combined_labels)
@@ -117,13 +119,22 @@ class Classifier(pl.LightningModule):
         accuracy = self.val_accuracy(combined_preds, combined_labels)
         self.log('val_accuracy', accuracy, on_step=False, on_epoch=True)
         self.log('val_loss', class_loss)
-        conf_matrix = self.val_conf_matrix(combined_preds, combined_labels)
-        self.log('val_conf_matrix', conf_matrix.float().mean(), on_step=False, on_epoch=True)
         precision = self.val_precision(combined_preds, combined_labels)
         self.log('val_precision', precision, on_step=False, on_epoch=True)
         recall = self.val_recall(combined_preds, combined_labels)
         self.log('val_recall', recall, on_step=False, on_epoch=True)
+        conf_matrix = self.val_conf_matrix(combined_preds, combined_labels)
+        self.log_conf_matrix(conf_matrix, "val")
         return class_loss
+
+    def log_conf_matrix(self, conf_matrix, stage):
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.heatmap(conf_matrix.cpu().numpy(), annot=True, fmt='d', cmap='Blues', ax=ax)
+        ax.set_title(f'{stage.capitalize()} Confusion Matrix')
+        ax.set_xlabel('Predicted')
+        ax.set_ylabel('True')
+        plt.close(fig)
+        self.logger.experiment.log({f"{stage}_conf_matrix": wandb.Image(fig)})
 
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate, weight_decay=1e-4)
