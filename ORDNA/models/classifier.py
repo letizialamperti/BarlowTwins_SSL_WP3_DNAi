@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 
@@ -32,12 +31,12 @@ class OrdinalCrossEntropyLoss(nn.Module):
         prob = cum_probs[:, :-1] - cum_probs[:, 1:]
         one_hot_labels = torch.zeros_like(prob).scatter(1, labels.unsqueeze(1), 1)
         epsilon = 1e-9
-        prob = torch.clamp(prob, min=epsilon, max=1-epsilon)  # Add epsilon to avoid log(0)
+        prob = torch.clamp(prob, min=epsilon, max=1-epsilon)
         if self.class_weights is not None:
-            weights = self.class_weights[labels].view(-1, 1)
-            loss = - (one_hot_labels * torch.log(prob) + (1 - one-hot_labels) * torch.log(1 - prob)).sum(dim=1) * weights.squeeze()
+            class_weights = self.class_weights[labels].view(-1, 1)
+            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
         else:
-            loss = - (one-hot_labels * torch.log(prob) + (1 - one-hot_labels) * torch.log(1 - prob)).sum(dim=1)
+            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1)
         return loss.mean()
 
 class Classifier(pl.LightningModule):
@@ -46,16 +45,16 @@ class Classifier(pl.LightningModule):
         self.save_hyperparameters(ignore=['barlow_twins_model', 'train_dataset'])
         self.barlow_twins_model = barlow_twins_model.eval()
         self.num_classes = num_classes
-        self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device)
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
         self.classifier = nn.Sequential(
             nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Dropout(0.5),  # Add dropout layer
+            nn.Dropout(0.5),
             nn.Linear(1024, num_classes)
         )
+        self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device) if train_dataset is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
         if num_classes > 2:
             self.train_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
@@ -96,7 +95,7 @@ class Classifier(pl.LightningModule):
         accuracy = self.train_accuracy(combined_preds, combined_labels)
         self.log('train_accuracy', accuracy, on_step=False, on_epoch=True)
         conf_matrix = self.train_conf_matrix(combined_preds, combined_labels)
-        self.log('train_conf_matrix', conf_matrix)
+        self.log('train_conf_matrix', conf_matrix.mean(), on_step=False, on_epoch=True)
         precision = self.train_precision(combined_preds, combined_labels)
         self.log('train_precision', precision, on_step=False, on_epoch=True)
         recall = self.train_recall(combined_preds, combined_labels)
@@ -108,7 +107,7 @@ class Classifier(pl.LightningModule):
         if torch.any(labels >= self.num_classes):
             raise ValueError("Labels out of range")
         output1 = self(sample_subset1)
-        output2 = self(sample_subset2)
+        output2 = self.sample_subset2)
         labels = labels.to(self.device)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         pred1 = torch.argmax(output1, dim=1)
@@ -119,7 +118,7 @@ class Classifier(pl.LightningModule):
         self.log('val_accuracy', accuracy, on_step=False, on_epoch=True)
         self.log('val_loss', class_loss)
         conf_matrix = self.val_conf_matrix(combined_preds, combined_labels)
-        self.log('val_conf_matrix', conf_matrix)
+        self.log('val_conf_matrix', conf_matrix.mean(), on_step=False, on_epoch=True)
         precision = self.val_precision(combined_preds, combined_labels)
         self.log('val_precision', precision, on_step=False, on_epoch=True)
         recall = self.val_recall(combined_preds, combined_labels)
@@ -128,5 +127,5 @@ class Classifier(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate, weight_decay=1e-4)
-        scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=5, verbose=True)
         return {'optimizer': optimizer, 'lr_scheduler': scheduler, 'monitor': 'val_loss'}
