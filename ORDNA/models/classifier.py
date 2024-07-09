@@ -51,7 +51,7 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
-            nn.Dropout(0.2),
+            nn.Dropout(0.5),
             nn.Linear(1024, num_classes)
         )
         self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device) if train_dataset is not None else None
@@ -95,7 +95,7 @@ class Classifier(pl.LightningModule):
         accuracy = self.train_accuracy(combined_preds, combined_labels)
         self.log('train_accuracy', accuracy, on_step=False, on_epoch=True)
         conf_matrix = self.train_conf_matrix(combined_preds, combined_labels)
-        self.log('train_conf_matrix', conf_matrix.mean(), on_step=False, on_epoch=True)
+        self.log('train_conf_matrix', conf_matrix.float().mean(), on_step=False, on_epoch=True)
         precision = self.train_precision(combined_preds, combined_labels)
         self.log('train_precision', precision, on_step=False, on_epoch=True)
         recall = self.train_recall(combined_preds, combined_labels)
@@ -118,7 +118,7 @@ class Classifier(pl.LightningModule):
         self.log('val_accuracy', accuracy, on_step=False, on_epoch=True)
         self.log('val_loss', class_loss)
         conf_matrix = self.val_conf_matrix(combined_preds, combined_labels)
-        self.log('val_conf_matrix', conf_matrix.mean(), on_step=False, on_epoch=True)
+        self.log('val_conf_matrix', conf_matrix.float().mean(), on_step=False, on_epoch=True)
         precision = self.val_precision(combined_preds, combined_labels)
         self.log('val_precision', precision, on_step=False, on_epoch=True)
         recall = self.val_recall(combined_preds, combined_labels)
