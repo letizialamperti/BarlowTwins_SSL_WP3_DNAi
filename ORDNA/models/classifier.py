@@ -8,6 +8,7 @@ from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+import wandb
 from pytorch_lightning.loggers import WandbLogger
 
 def calculate_class_weights(dataset, num_classes):
