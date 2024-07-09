@@ -36,6 +36,9 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
                 sequence_length=self.sequence_length
             )
 
+    def get_train_dataset(self):
+        return self.train_dataset
+
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
             dataset=self.train_dataset, 
