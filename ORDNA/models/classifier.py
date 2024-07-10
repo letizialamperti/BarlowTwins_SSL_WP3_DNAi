@@ -5,11 +5,6 @@ import pytorch_lightning as pl
 from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
-import matplotlib.pyplot as plt
-import seaborn as sns
-import numpy as np
-import wandb
-from pytorch_lightning.loggers import WandbLogger
 
 def calculate_class_weights(dataset, num_classes):
     labels = []
@@ -53,11 +48,11 @@ class Classifier(pl.LightningModule):
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
         self.classifier = nn.Sequential(
-            nn.Linear(sample_repr_dim, 512),  # Reduce the number of units
-            nn.BatchNorm1d(512),
+            nn.Linear(sample_repr_dim, 256),  # 
+            nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(512, num_classes)  # Reduce the number of units
+            nn.Linear(256, num_classes)  # 
         )
         self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device) if train_dataset is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
@@ -124,16 +119,15 @@ class Classifier(pl.LightningModule):
         self.log('val_precision', precision, on_step=False, on_epoch=True)
         recall = self.val_recall(combined_preds, combined_labels)
         self.log('val_recall', recall, on_step=False, on_epoch=True)
-        conf_matrix = self.val_conf_matrix(combined_preds, combined_labels)
-        self.log_conf_matrix(conf_matrix, "val")
         return class_loss
 
     def log_conf_matrix(self, conf_matrix, stage):
+        conf_matrix = conf_matrix.cpu().numpy()
         fig, ax = plt.subplots(figsize=(8, 6))
-        sns.heatmap(conf_matrix.cpu().numpy(), annot=True, fmt='d', cmap='Blues', ax=ax)
+        sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=range(self.num_classes), yticklabels=range(self.num_classes))
+        ax.set_xlabel('Predicted Labels')
+        ax.set_ylabel('True Labels')
         ax.set_title(f'{stage.capitalize()} Confusion Matrix')
-        ax.set_xlabel('Predicted')
-        ax.set_ylabel('True')
         plt.close(fig)
         self.logger.experiment.log({f"{stage}_conf_matrix": wandb.Image(fig)})
 
