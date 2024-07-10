@@ -48,11 +48,11 @@ class Classifier(pl.LightningModule):
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
         self.classifier = nn.Sequential(
-            nn.Linear(sample_repr_dim, 256),  # Ridurre ulteriormente il numero di unità
-            nn.BatchNorm1d(256),
+            nn.Linear(sample_repr_dim, 128),  # Ridurre ulteriormente il numero di unità
+            nn.BatchNorm1d(128),
             nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(256, num_classes)  # Ridurre ulteriormente il numero di unità
+            nn.Dropout(0.6),
+            nn.Linear(128, num_classes)  # Ridurre ulteriormente il numero di unità
         )
         self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device) if train_dataset is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
