@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 from torch.optim import AdamW
+from torch.optim.lr_scheduler import LambdaLR
 from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 
@@ -56,11 +57,11 @@ class Classifier(pl.LightningModule):
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
         self.classifier = nn.Sequential(
-            nn.Linear(sample_repr_dim, 512),  
-            nn.BatchNorm1d(512),
+            nn.Linear(sample_repr_dim, 128),  # Ridurre ulteriormente il numero di unità
+            nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(512, num_classes)
+            nn.Linear(128, num_classes)
         )
         self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device) if train_dataset is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
@@ -131,5 +132,13 @@ class Classifier(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate, weight_decay=1e-4)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3, verbose=True)
-        return {'optimizer': optimizer, 'lr_scheduler': scheduler, 'monitor': 'val_loss'}
+        
+        # Use LambdaLR to decay the learning rate within a single epoch
+        def lr_lambda(current_step):
+            total_steps = self.trainer.estimated_stepping_batches
+            return 1 - (current_step / total_steps)  # Linear decay
+
+        scheduler = LambdaLR(optimizer, lr_lambda)
+        
+        return [optimizer], [{'scheduler': scheduler, 'interval': 'step'}]
+
