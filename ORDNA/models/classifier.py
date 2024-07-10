@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import pytorch_lightning as pl
 from torch.optim import AdamW
-from torch.optim.lr_scheduler import LambdaLR
 from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 
@@ -13,25 +12,20 @@ def calculate_class_weights(dataset, num_classes):
         labels.append(label)
     labels = torch.tensor(labels)
     class_counts = torch.bincount(labels, minlength=num_classes)
-    class_weights = 1.0 / (class_counts.float() + 1e-9)
-    class_weights = class_weights / class_weights.sum() * num_classes
+    class_weights = 1.0 / class_counts.float()
+    class_weights = class_weights / class_weights.sum() * num_classes  # Normalize weights
     return class_weights
 
 class OrdinalCrossEntropyLoss(nn.Module):
-    def __init__(self, num_classes, class_weights=None, alpha=0.5):
+    def __init__(self, num_classes, class_weights=None):
         super(OrdinalCrossEntropyLoss, self).__init__()
         self.num_classes = num_classes
         self.class_weights = class_weights
-        self.alpha = alpha
 
     def forward(self, logits, labels):
         logits = logits.to(labels.device)
         logits = logits.view(-1, self.num_classes)
         labels = labels.view(-1)
-
-        # Normalizzazione dei logit
-        logits = (logits - logits.mean(dim=1, keepdim=True)) / (logits.std(dim=1, keepdim=True) + 1e-9)
-
         cum_probs = torch.sigmoid(logits)
         cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
         prob = cum_probs[:, :-1] - cum_probs[:, 1:]
@@ -43,10 +37,7 @@ class OrdinalCrossEntropyLoss(nn.Module):
             loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
         else:
             loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1)
-        
-        # Regolarizzazione L2 sui logit
-        reg_loss = self.alpha * torch.mean(torch.sum(torch.square(logits), dim=1))
-        return loss.mean() + reg_loss
+        return loss.mean()
 
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, train_dataset=None):
@@ -57,11 +48,11 @@ class Classifier(pl.LightningModule):
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
         self.classifier = nn.Sequential(
-            nn.Linear(sample_repr_dim, 128),  # Ridurre ulteriormente il numero di unità
-            nn.BatchNorm1d(128),
+            nn.Linear(sample_repr_dim, 256),  # Ridurre ulteriormente il numero di unità
+            nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(128, num_classes)
+            nn.Linear(256, num_classes)  # Ridurre ulteriormente il numero di unità
         )
         self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device) if train_dataset is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
@@ -130,15 +121,17 @@ class Classifier(pl.LightningModule):
         self.log('val_recall', recall, on_step=False, on_epoch=True)
         return class_loss
 
+    def log_conf_matrix(self, conf_matrix, stage):
+        conf_matrix = conf_matrix.cpu().numpy()
+        fig, ax = plt.subplots(figsize=(8, 6))
+        sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=range(self.num_classes), yticklabels=range(self.num_classes))
+        ax.set_xlabel('Predicted Labels')
+        ax.set_ylabel('True Labels')
+        ax.set_title(f'{stage.capitalize()} Confusion Matrix')
+        plt.close(fig)
+        self.logger.experiment.log({f"{stage}_conf_matrix": wandb.Image(fig)})
+
     def configure_optimizers(self):
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate, weight_decay=1e-4)
-        
-        # Use LambdaLR to decay the learning rate within a single epoch
-        def lr_lambda(current_step):
-            total_steps = self.trainer.estimated_stepping_batches
-            return 1 - (current_step / total_steps)  # Linear decay
-
-        scheduler = LambdaLR(optimizer, lr_lambda)
-        
-        return [optimizer], [{'scheduler': scheduler, 'interval': 'step'}]
-
+        scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=self.hparams.initial_learning_rate, total_steps=self.trainer.estimated_stepping_batches)
+        return [optimizer], [scheduler]
