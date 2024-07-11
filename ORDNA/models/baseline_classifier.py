@@ -1,12 +1,8 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import pytorch_lightning as pl
 from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
-import matplotlib.pyplot as plt
-import seaborn as sns
-import wandb
 
 def calculate_class_weights(dataset, num_classes):
     labels = []
@@ -46,29 +42,21 @@ class BaselineClassifier(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters(ignore=['train_dataset'])
         self.num_classes = num_classes
-
-        self.feature_extractor = nn.Sequential(
-            nn.Linear(input_dim, 512),
-            nn.BatchNorm1d(512),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(512, 256),
+        print("Creating classifier network...")
+        self.classifier = nn.Sequential(
+            nn.Linear(input_dim, 256),  # Ridurre ulteriormente il numero di unità
             nn.BatchNorm1d(256),
             nn.ReLU(),
-            nn.Dropout(0.5)
-        )
-
-        self.classifier = nn.Sequential(
-            nn.Linear(256, 128),
+            nn.Dropout(0.6),
+            nn.Linear(256, 128),  # Ridurre ulteriormente il numero di unità
             nn.BatchNorm1d(128),
             nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(128, num_classes)
+            nn.Dropout(0.6),
+            nn.Linear(128, num_classes)  # Ridurre ulteriormente il numero di unità
         )
-
+        print("Classifier network created.")
         self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device) if train_dataset is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
-
         if num_classes > 2:
             self.train_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
             self.val_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
@@ -89,9 +77,7 @@ class BaselineClassifier(pl.LightningModule):
             self.val_recall = Recall(task="binary")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        features = self.feature_extractor(x)
-        logits = self.classifier(features)
-        return logits.squeeze(dim=1)
+        return self.classifier(x).squeeze(dim=1)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
@@ -130,7 +116,7 @@ class BaselineClassifier(pl.LightningModule):
         self.log('val_accuracy', accuracy, on_step=False, on_epoch=True)
         self.log('val_loss', class_loss)
         precision = self.val_precision(combined_preds, combined_labels)
-        self.log('val_precision', precision, on_step=False, on_epoch=True)
+        self.log('val_precision', precision, on_step=True, on_epoch=True)
         recall = self.val_recall(combined_preds, combined_labels)
         self.log('val_recall', recall, on_step=False, on_epoch=True)
         return class_loss
