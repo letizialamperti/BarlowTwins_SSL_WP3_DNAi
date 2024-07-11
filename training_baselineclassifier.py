@@ -48,7 +48,7 @@ print(f"Checkpoint directory: {checkpoint_dir}")
 checkpoint_callback = ModelCheckpoint(
     monitor='val_accuracy',  # Ensure this metric is logged in your model
     dirpath=checkpoint_dir,
-    filename='classifier-{epoch:02d}-{val_accuracy:.2f}',
+    filename='baseline_classifier-{epoch:02d}-{val_accuracy:.2f}',
     save_top_k=3,
     mode='max',
 )
