@@ -48,7 +48,7 @@ checkpoint_callback = ModelCheckpoint(
 )
 
 # Setup logger e trainer
-wandb_logger = WandbLogger(project='ORDNA_Class', save_dir=Path("lightning_logs"), config=args, log_model=False)
+wandb_logger = WandbLogger(project='ORDNA_Class', save_dir=Path("lightning_logs").resolve(), config=args, log_model=False)
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
