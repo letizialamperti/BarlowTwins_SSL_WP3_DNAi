@@ -1,12 +1,11 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import pytorch_lightning as pl
 from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
-import matplotlib.pyplot as plt
-import seaborn as sns
-import wandb
-from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  
+from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
+import wandb  # Importa Wandb per il logging
 
 def calculate_class_weights(dataset, num_classes):
     labels = []
@@ -46,19 +45,19 @@ class BinaryClassifier(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters(ignore=['barlow_twins_model', 'train_dataset'])
         self.barlow_twins_model = barlow_twins_model.eval()
-        self.num_classes = 2  # Binary classification
+        self.num_classes = 2  # For binary classification
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
         self.classifier = nn.Sequential(
-            nn.Linear(sample_repr_dim, 256),  # Ridurre ulteriormente il numero di unità
+            nn.Linear(sample_repr_dim, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.6),
-            nn.Linear(256, 128),  # Ridurre ulteriormente il numero di unità
+            nn.Linear(256, 128),
             nn.BatchNorm1d(128),
             nn.ReLU(),
             nn.Dropout(0.6),
-            nn.Linear(128, self.num_classes)  # Ridurre ulteriormente il numero di unità
+            nn.Linear(128, self.num_classes)
         )
         self.class_weights = calculate_class_weights(train_dataset, self.num_classes).to(self.device) if train_dataset is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(self.num_classes, self.class_weights)
@@ -109,7 +108,7 @@ class BinaryClassifier(pl.LightningModule):
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.val_accuracy(combined_preds, combined_labels)
-        self.log('val_accuracy', accuracy, on_step=False, on_epoch=True)
+        self.log('val_accuracy', accuracy, on_step=True, on_epoch=True)
         self.log('val_loss', class_loss)
         precision = self.val_precision(combined_preds, combined_labels)
         self.log('val_precision', precision, on_step=False, on_epoch=True)
