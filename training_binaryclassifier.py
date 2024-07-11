@@ -15,6 +15,7 @@ if args.arg_log:
 
 pl.seed_everything(args.seed)
 
+print("Setting up data module...")
 samples_dir = Path(args.samples_dir).resolve()
 
 datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
@@ -25,19 +26,25 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
 
 # Setup the data module (ensuring that train_dataset is defined)
 datamodule.setup(stage='fit')
+print("Data module setup complete.")
 
 # Carica il modello Barlow Twins addestrato
+print("Loading Barlow Twins model...")
 barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model-epoch=01-v1.ckpt")
+print("Barlow Twins model loaded.")
 
 # Crea il classificatore binario con il modello Barlow Twins congelato
+print("Creating Binary Classifier model...")
 model = BinaryClassifier(barlow_twins_model=barlow_twins_model, 
                          sample_repr_dim=args.sample_repr_dim, 
                          initial_learning_rate=args.initial_learning_rate,
                          train_dataset=datamodule.get_train_dataset())
+print("Binary Classifier model created.")
 
 # Checkpoint directory
 checkpoint_dir = Path('checkpoints_classifier')
 checkpoint_dir.mkdir(parents=True, exist_ok=True)
+print(f"Checkpoint directory: {checkpoint_dir}")
 
 # General checkpoint callback for best model saving
 checkpoint_callback = ModelCheckpoint(
@@ -50,6 +57,8 @@ checkpoint_callback = ModelCheckpoint(
 
 # Setup logger e trainer
 wandb_logger = WandbLogger(project='ORDNA_Class', save_dir=Path("lightning_logs"), config=args, log_model=False)
+print("Wandb logger setup complete.")
+
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
@@ -59,5 +68,8 @@ trainer = pl.Trainer(
     detect_anomaly=False
 )
 
+print("Trainer setup complete.")
+
 # Start training
 trainer.fit(model=model, datamodule=datamodule)
+print("Training started.")
