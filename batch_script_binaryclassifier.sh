@@ -7,8 +7,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --constraint=gpu
-#SBATCH --output=classifier-logfile-%j.log
-#SBATCH --error=classifier-errorfile-%j.err
+#SBATCH --output=bin_classifier-logfile-%j.log
+#SBATCH --error=bin_classifier-errorfile-%j.err
 #SBATCH --account=sd29
 
 # Module loading section
@@ -25,7 +25,7 @@ LABELS_FILE="label/ordinal_label_Sud_Corse.csv"
 # Command to run the Python script
 echo "Starting the training process."
 export CUDA_LAUNCH_BLOCKING=1
-srun -ul $HOME/miniconda3/envs/diaus_1/bin/python  training_binaryclassifier.py \
+srun -ul $HOME/miniconda3/envs/diaus_1/bin/python training_binaryclassifier.py \
     --arg_log True \
     --samples_dir $DATASET_DIR \
     --labels_file $LABELS_FILE \
@@ -41,3 +41,4 @@ srun -ul $HOME/miniconda3/envs/diaus_1/bin/python  training_binaryclassifier.py 
     --max_epochs 2
 
 echo "Training completed successfully."
+
