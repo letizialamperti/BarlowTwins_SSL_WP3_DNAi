@@ -6,6 +6,7 @@ from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
 import matplotlib.pyplot as plt
 import seaborn as sns
 import wandb
+from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  
 
 def calculate_class_weights(dataset, num_classes):
     labels = []
