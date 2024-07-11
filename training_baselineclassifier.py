@@ -4,10 +4,8 @@ from pathlib import Path
 from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
-from ORDNA.models.baseline_classifier import BaselineClassifier 
+from ORDNA.models.baseline_classifier import BaselineClassifier  # Assicurati che il nome e il percorso siano corretti
 from ORDNA.utils.argparser import get_args, write_config_file
-
-
 
 # Usa la stessa configurazione
 args = get_args()
@@ -23,6 +21,9 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
                                    sequence_length=args.sequence_length, 
                                    sample_subset_size=args.sample_subset_size,
                                    batch_size=args.batch_size)
+
+# Setup the data module (ensuring that train_dataset is defined)
+datamodule.setup(stage='fit')
 
 # Calcola l'input_dim basato sui dati
 input_dim = args.sequence_length * args.sample_subset_size
