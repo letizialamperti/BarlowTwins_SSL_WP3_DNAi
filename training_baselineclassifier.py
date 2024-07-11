@@ -7,6 +7,8 @@ from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.baseline_classifier import BaselineClassifier 
 from ORDNA.utils.argparser import get_args, write_config_file
 
+
+
 # Usa la stessa configurazione
 args = get_args()
 if args.arg_log:
