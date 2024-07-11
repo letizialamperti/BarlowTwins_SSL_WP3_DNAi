@@ -18,9 +18,10 @@ module load cray-python
 # Activate conda environment
 source activate diaus_1
 
+
 # Define dataset and labels path
-DATASET_DIR="/store/sdsc/sd29/letizia/sud_corse"
-LABELS_FILE="label/labels_numeric_binary_MPA_Sud_corse.csv"
+DATASET_DIR="/store/sdsc/sd29/letizia/dataset_5_levels_460"
+LABELS_FILE="label/labels_5_levels.csv"
 
 # Command to run the Python script
 echo "Starting the training process."
@@ -31,7 +32,7 @@ srun -ul $HOME/miniconda3/envs/diaus_1/bin/python training_BarlowTwins.py \
     --embedder_type barlow_twins \
     --sequence_length 300 \
     --sample_subset_size 500 \
-    --num_classes 2 \
+    --num_classes 5 \
     --batch_size 32 \
     --token_emb_dim 8 \
     --sample_repr_dim 128 \
