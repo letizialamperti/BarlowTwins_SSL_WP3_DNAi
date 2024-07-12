@@ -37,6 +37,9 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
                                    sample_subset_size=args.sample_subset_size,
                                    batch_size=args.batch_size)
 
+# Setup the data module (ensuring that train_dataset is defined)
+datamodule.setup(stage='fit')
+
 # Carica il modello Barlow Twins addestrato
 barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model_bigdataset-epoch=00.ckpt") #dataset 460: BT_model_bigdataset-epoch=00.ckpt, sud_corse: BT_model-epoch=01-v1.ckpt
 
