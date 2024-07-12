@@ -17,28 +17,20 @@ def calculate_class_weights(dataset, num_classes):
     class_weights = class_weights / class_weights.sum() * num_classes  # Normalize weights
     return class_weights
 
-class OrdinalCrossEntropyLoss(nn.Module):
-    def __init__(self, num_classes, class_weights=None):
-        super(OrdinalCrossEntropyLoss, self).__init__()
-        self.num_classes = num_classes
+class BinaryCrossEntropyLoss(nn.Module):
+    def __init__(self, class_weights=None):
+        super(BinaryCrossEntropyLoss, self).__init__()
         self.class_weights = class_weights
 
     def forward(self, logits, labels):
         logits = logits.to(labels.device)
-        logits = logits.view(-1, self.num_classes)
-        labels = labels.view(-1)
-        cum_probs = torch.sigmoid(logits)
-        cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
-        prob = cum_probs[:, :-1] - cum_probs[:, 1:]
-        one_hot_labels = torch.zeros_like(prob).scatter(1, labels.unsqueeze(1), 1)
-        epsilon = 1e-9
-        prob = torch.clamp(prob, min=epsilon, max=1-epsilon)
+        labels = labels.view(-1).float()
         if self.class_weights is not None:
-            class_weights = self.class_weights[labels].view(-1, 1)
-            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
+            class_weights = self.class_weights[labels.long()].to(logits.device)
+            loss = F.binary_cross_entropy_with_logits(logits, labels, weight=class_weights)
         else:
-            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1)
-        return loss.mean()
+            loss = F.binary_cross_entropy_with_logits(logits, labels)
+        return loss
 
 class BinaryClassifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, initial_learning_rate: float = 1e-5, train_dataset=None):
@@ -53,14 +45,10 @@ class BinaryClassifier(pl.LightningModule):
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.6),
-            nn.Linear(256, 128),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-            nn.Dropout(0.6),
-            nn.Linear(128, self.num_classes)
+            nn.Linear(256, 1)  # Output a single value for binary classification
         )
         self.class_weights = calculate_class_weights(train_dataset, self.num_classes).to(self.device) if train_dataset is not None else None
-        self.loss_fn = OrdinalCrossEntropyLoss(self.num_classes, self.class_weights)
+        self.loss_fn = BinaryCrossEntropyLoss(self.class_weights)
         self.train_accuracy = Accuracy(task="binary")
         self.val_accuracy = Accuracy(task="binary")
         self.train_conf_matrix = ConfusionMatrix(task="binary")
@@ -83,16 +71,16 @@ class BinaryClassifier(pl.LightningModule):
         labels = labels.to(self.device)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('class_loss', class_loss)
-        pred1 = torch.argmax(output1, dim=1)
-        pred2 = torch.argmax(output2, dim=1)
+        pred1 = torch.sigmoid(output1) > 0.5
+        pred2 = torch.sigmoid(output2) > 0.5
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.train_accuracy(combined_preds, combined_labels)
-        self.log('train_accuracy', accuracy, on_step=False, on_epoch=True)
+        self.log('train_accuracy', accuracy, on_step=True, on_epoch=True)
         precision = self.train_precision(combined_preds, combined_labels)
-        self.log('train_precision', precision, on_step=False, on_epoch=True)
+        self.log('train_precision', precision, on_step=True, on_epoch=True)
         recall = self.train_recall(combined_preds, combined_labels)
-        self.log('train_recall', recall, on_step=False, on_epoch=True)
+        self.log('train_recall', recall, on_step=True, on_epoch=True)
         return class_loss
 
     def validation_step(self, batch, batch_idx: int):
@@ -103,17 +91,17 @@ class BinaryClassifier(pl.LightningModule):
         output2 = self(sample_subset2)
         labels = labels.to(self.device)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-        pred1 = torch.argmax(output1, dim=1)
-        pred2 = torch.argmax(output2, dim=1)
+        pred1 = torch.sigmoid(output1) > 0.5
+        pred2 = torch.sigmoid(output2) > 0.5
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.val_accuracy(combined_preds, combined_labels)
         self.log('val_accuracy', accuracy, on_step=True, on_epoch=True)
         self.log('val_loss', class_loss)
         precision = self.val_precision(combined_preds, combined_labels)
-        self.log('val_precision', precision, on_step=False, on_epoch=True)
+        self.log('val_precision', precision, on_step=True, on_epoch=True)
         recall = self.val_recall(combined_preds, combined_labels)
-        self.log('val_recall', recall, on_step=False, on_epoch=True)
+        self.log('val_recall', recall, on_step=True, on_epoch=True)
         return class_loss
 
     def log_conf_matrix(self, conf_matrix, stage):
