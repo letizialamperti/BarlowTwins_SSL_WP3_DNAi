@@ -2,7 +2,7 @@ import torch
 import pytorch_lightning as pl
 from pathlib import Path
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping  # Import EarlyStopping
 from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
@@ -45,13 +45,22 @@ checkpoint_callback = ModelCheckpoint(
     mode='max',
 )
 
+# Early stopping callback
+early_stopping_callback = EarlyStopping(
+    monitor='val_loss',  # Monitor validation loss
+    patience=100,  # Number of validation steps with no improvement after which training will be stopped
+    mode='min',
+    verbose=True,
+    check_on_train_epoch_end=False  # Check on validation steps
+)
+
 # Setup logger e trainer
 wandb_logger = WandbLogger(project='ORDNA_Class', save_dir=Path("lightning_logs"), config=args, log_model=False)
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
     logger=wandb_logger,
-    callbacks=[checkpoint_callback],
+    callbacks=[checkpoint_callback, early_stopping_callback],
     log_every_n_steps=10,
     detect_anomaly=False
 )
