@@ -76,11 +76,11 @@ class ValidationOnStepCallback(pl.Callback):
 
 print("Setting up Wandb logger...")
 # Setup logger e trainer
-wandb_logger = WandbLogger(project='ORDNA_Class', save_dir=Path("lightning_logs"), config=args, log_model=False)
+wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=Path("lightning_logs"), config=args, log_model=False)
 
 # Inizializzazione Wandb
 print("Initializing Wandb run...")
-wandb_run = wandb.init(project='ORDNA_Class', config=args)
+wandb_run = wandb.init(project='ORDNA_Class_july', config=args)
 
 # Print Wandb run URL
 print(f"Wandb run URL: {wandb_run.url}")
