@@ -71,7 +71,10 @@ class ValidationOnStepCallback(pl.Callback):
 wandb_logger = WandbLogger(project='ORDNA_Class', save_dir=Path("lightning_logs"), config=args, log_model=False)
 
 # Inizializzazione Wandb
-wandb.init(project='ORDNA_Class', config=args)
+wandb_run = wandb.init(project='ORDNA_Class', config=args)
+
+# Print Wandb run URL
+print(f"Wandb run URL: {wandb_run.url}")
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
@@ -87,4 +90,3 @@ trainer.fit(model=model, datamodule=datamodule)
 
 # Chiudi Wandb
 wandb.finish()
-
