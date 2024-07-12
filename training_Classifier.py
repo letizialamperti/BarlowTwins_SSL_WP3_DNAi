@@ -8,21 +8,18 @@ from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
 import wandb  # Import Wandb
-import logging  # Import logging
-
-# Configura il logger
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Usa la stessa configurazione
 args = get_args()
 if args.arg_log:
     write_config_file(args)
 
+print("Setting random seed...")
 pl.seed_everything(args.seed)
 
 samples_dir = Path(args.samples_dir).resolve()
 
+print("Initializing data module...")
 datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
                                    labels_file=Path(args.labels_file).resolve(), 
                                    sequence_length=args.sequence_length, 
@@ -32,9 +29,11 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
 # Setup the data module (ensuring that train_dataset is defined)
 datamodule.setup(stage='fit')
 
+print("Loading Barlow Twins model...")
 # Carica il modello Barlow Twins addestrato
 barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model_bigdataset-epoch=00.ckpt") #dataset 460
 
+print("Initializing classifier model...")
 # Crea il classificatore con il modello Barlow Twins congelato
 model = Classifier(barlow_twins_model=barlow_twins_model, 
                    sample_repr_dim=args.sample_repr_dim, 
@@ -42,10 +41,12 @@ model = Classifier(barlow_twins_model=barlow_twins_model,
                    initial_learning_rate=args.initial_learning_rate,
                    train_dataset=datamodule.get_train_dataset())
 
+print("Setting up checkpoint directory...")
 # Checkpoint directory
 checkpoint_dir = Path('checkpoints_classifier')
 checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
+print("Initializing checkpoint callback...")
 # General checkpoint callback for best model saving
 checkpoint_callback = ModelCheckpoint(
     monitor='val_accuracy',  # Ensure this metric is logged in your model
@@ -55,6 +56,7 @@ checkpoint_callback = ModelCheckpoint(
     mode='max',
 )
 
+print("Initializing early stopping callback...")
 # Early stopping callback
 early_stopping_callback = EarlyStopping(
     monitor='val_loss',  # Monitor validation loss
@@ -72,29 +74,31 @@ class ValidationOnStepCallback(pl.Callback):
         for batch in val_dataloader:
             pl_module.validation_step(batch, batch_idx=None)
 
+print("Setting up Wandb logger...")
 # Setup logger e trainer
 wandb_logger = WandbLogger(project='ORDNA_Class', save_dir=Path("lightning_logs"), config=args, log_model=False)
 
 # Inizializzazione Wandb
+print("Initializing Wandb run...")
 wandb_run = wandb.init(project='ORDNA_Class', config=args)
 
 # Print Wandb run URL
 print(f"Wandb run URL: {wandb_run.url}")
-logger.info(f"Wandb run URL: {wandb_run.url}")
 
+print("Initializing trainer...")
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
     logger=wandb_logger,
     callbacks=[checkpoint_callback, early_stopping_callback, ValidationOnStepCallback()],
     log_every_n_steps=10,
-    detect_anomaly=False,
-    enable_progress_bar=True,  # Assicurati che la barra di progresso sia abilitata
-    enable_model_summary=True  # Assicurati che il sommario del modello sia abilitato
+    detect_anomaly=False
 )
 
 # Start training
+print("Starting training...")
 trainer.fit(model=model, datamodule=datamodule)
 
 # Chiudi Wandb
+print("Finishing Wandb run...")
 wandb.finish()
