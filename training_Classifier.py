@@ -34,7 +34,7 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
                                    batch_size=args.batch_size)
 
 
-datamodule.setup(stage='fit')
+
 
 print("Loading Barlow Twins model...")
 # Carica il modello Barlow Twins addestrato
