@@ -40,7 +40,7 @@ checkpoint_dir.mkdir(parents=True, exist_ok=True)
 checkpoint_callback = ModelCheckpoint(
     monitor='val_accuracy',  # Ensure this metric is logged in your model
     dirpath=checkpoint_dir,
-    filename='classifier-{epoch:02d}-{val_accuracy:.2f}',
+    filename='big_dataset_classifier-{epoch:02d}-{val_accuracy:.2f}',
     save_top_k=3,
     mode='max',
 )
