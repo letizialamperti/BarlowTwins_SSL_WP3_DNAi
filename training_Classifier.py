@@ -69,6 +69,9 @@ trainer = pl.Trainer(
     detect_anomaly=False
 )
 
+# Inizializzazione Wandb
+wandb.init(project='ORDNA_Class', config=args)
+
 # Start training
 trainer.fit(model=model, datamodule=datamodule)
 
