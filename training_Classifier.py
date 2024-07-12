@@ -7,6 +7,7 @@ from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
+import wandb  # Import Wandb
 
 # Usa la stessa configurazione
 args = get_args()
@@ -27,7 +28,7 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
 datamodule.setup(stage='fit')
 
 # Carica il modello Barlow Twins addestrato
-barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model_bigdataset-epoch=00.ckpt") ##dataset 460: BT_model_bigdataset-epoch=00.ckpt, sud_corse: BT_model-epoch=01-v1.ckpt
+barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model_bigdataset-epoch=00.ckpt") #dataset 460
 
 # Crea il classificatore con il modello Barlow Twins congelato
 model = Classifier(barlow_twins_model=barlow_twins_model, 
@@ -58,21 +59,32 @@ early_stopping_callback = EarlyStopping(
     check_on_train_epoch_end=False  # Check on validation steps
 )
 
+# Callback for validation on each step
+class ValidationOnStepCallback(pl.Callback):
+    def on_validation_epoch_start(self, trainer, pl_module):
+        datamodule = trainer.datamodule
+        val_dataloader = datamodule.val_dataloader()
+        for batch in val_dataloader:
+            pl_module.validation_step(batch, batch_idx=None)
+
 # Setup logger e trainer
 wandb_logger = WandbLogger(project='ORDNA_Class', save_dir=Path("lightning_logs"), config=args, log_model=False)
-trainer = pl.Trainer(
-    accelerator='gpu' if torch.cuda.is_available() else 'cpu',
-    max_epochs=args.max_epochs,
-    logger=wandb_logger,
-    callbacks=[checkpoint_callback, early_stopping_callback],
-    log_every_n_steps=10,
-    detect_anomaly=False
-)
 
 # Inizializzazione Wandb
 wandb.init(project='ORDNA_Class', config=args)
 
+trainer = pl.Trainer(
+    accelerator='gpu' if torch.cuda.is_available() else 'cpu',
+    max_epochs=args.max_epochs,
+    logger=wandb_logger,
+    callbacks=[checkpoint_callback, early_stopping_callback, ValidationOnStepCallback()],
+    log_every_n_steps=10,
+    detect_anomaly=False
+)
+
 # Start training
 trainer.fit(model=model, datamodule=datamodule)
 
+# Chiudi Wandb
+wandb.finish()
 
