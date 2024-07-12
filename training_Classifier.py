@@ -9,6 +9,13 @@ from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
 import wandb  # Import Wandb
 
+# Controllo se la GPU è disponibile
+if torch.cuda.is_available():
+    print(f"GPU is available. Device: {torch.cuda.get_device_name(0)}")
+else:
+    print("GPU not available, using CPU.")
+
+
 # Usa la stessa configurazione
 args = get_args()
 if args.arg_log:
