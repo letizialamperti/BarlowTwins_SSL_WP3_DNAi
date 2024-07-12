@@ -31,7 +31,7 @@ datamodule.setup(stage='fit')
 
 print("Loading Barlow Twins model...")
 # Carica il modello Barlow Twins addestrato
-barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model_bigdataset-epoch=00.ckpt") #dataset 460
+barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model-epoch=01-v1.ckpt") #dataset 460
 
 print("Initializing classifier model...")
 # Crea il classificatore con il modello Barlow Twins congelato
