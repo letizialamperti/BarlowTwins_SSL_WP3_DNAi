@@ -91,17 +91,17 @@ class Classifier(pl.LightningModule):
         output2 = self(sample_subset2)
         labels = labels.to(self.device)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-        self.log('class_loss', class_loss)
+        self.log('class_loss', class_loss, on_step=True, on_epoch=True)
         pred1 = torch.argmax(output1, dim=1)
         pred2 = torch.argmax(output2, dim=1)
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.train_accuracy(combined_preds, combined_labels)
-        self.log('train_accuracy', accuracy, on_step=False, on_epoch=True)
+        self.log('train_accuracy', accuracy, on_step=True, on_epoch=True)
         precision = self.train_precision(combined_preds, combined_labels)
-        self.log('train_precision', precision, on_step=False, on_epoch=True)
+        self.log('train_precision', precision, on_step=True, on_epoch=True)
         recall = self.train_recall(combined_preds, combined_labels)
-        self.log('train_recall', recall, on_step=False, on_epoch=True)
+        self.log('train_recall', recall, on_step=True, on_epoch=True)
         return class_loss
 
     def validation_step(self, batch, batch_idx: int):
@@ -117,12 +117,12 @@ class Classifier(pl.LightningModule):
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.val_accuracy(combined_preds, combined_labels)
-        self.log('val_accuracy', accuracy, on_step=False, on_epoch=True)
-        self.log('val_loss', class_loss)
+        self.log('val_accuracy', accuracy, on_step=True, on_epoch=True)
+        self.log('val_loss', class_loss, on_step=True, on_epoch=True)
         precision = self.val_precision(combined_preds, combined_labels)
-        self.log('val_precision', precision, on_step=False, on_epoch=True)
+        self.log('val_precision', precision, on_step=True, on_epoch=True)
         recall = self.val_recall(combined_preds, combined_labels)
-        self.log('val_recall', recall, on_step=False, on_epoch=True)
+        self.log('val_recall', recall, on_step=True, on_epoch=True)
         return class_loss
 
     def log_conf_matrix(self, conf_matrix, stage):
