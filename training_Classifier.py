@@ -8,6 +8,11 @@ from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
 import wandb  # Import Wandb
+import logging  # Import logging
+
+# Configura il logger
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Usa la stessa configurazione
 args = get_args()
@@ -75,6 +80,7 @@ wandb_run = wandb.init(project='ORDNA_Class', config=args)
 
 # Print Wandb run URL
 print(f"Wandb run URL: {wandb_run.url}")
+logger.info(f"Wandb run URL: {wandb_run.url}")
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
@@ -82,7 +88,9 @@ trainer = pl.Trainer(
     logger=wandb_logger,
     callbacks=[checkpoint_callback, early_stopping_callback, ValidationOnStepCallback()],
     log_every_n_steps=10,
-    detect_anomaly=False
+    detect_anomaly=False,
+    enable_progress_bar=True,  # Assicurati che la barra di progresso sia abilitata
+    enable_model_summary=True  # Assicurati che il sommario del modello sia abilitato
 )
 
 # Start training
