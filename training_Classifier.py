@@ -1,8 +1,22 @@
+import pytorch_lightning as pl
+from pytorch_lightning.callbacks import Callback
+
+class ValidationOnStepCallback(Callback):
+    def __init__(self, val_check_interval):
+        self.val_check_interval = val_check_interval
+
+    def on_batch_end(self, trainer, pl_module):
+        # Perform validation at the specified interval
+        if (trainer.global_step + 1) % self.val_check_interval == 0:
+            trainer.validate()
+
+# Utilizzo del callback personalizzato nel file di training
+
 import torch
 import pytorch_lightning as pl
 from pathlib import Path
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping  # Import EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
@@ -30,7 +44,8 @@ barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("chec
 model = Classifier(barlow_twins_model=barlow_twins_model, 
                    sample_repr_dim=args.sample_repr_dim, 
                    num_classes=args.num_classes, 
-                   initial_learning_rate=args.initial_learning_rate)
+                   initial_learning_rate=args.initial_learning_rate,
+                   train_dataset=datamodule.get_train_dataset())
 
 # Checkpoint directory
 checkpoint_dir = Path('checkpoints_classifier')
@@ -54,16 +69,20 @@ early_stopping_callback = EarlyStopping(
     check_on_train_epoch_end=False  # Check on validation steps
 )
 
+# Callback per validazione ad ogni N step
+validation_step_callback = ValidationOnStepCallback(val_check_interval=100)  # Scegli il valore di val_check_interval
+
 # Setup logger e trainer
 wandb_logger = WandbLogger(project='ORDNA_Class', save_dir=Path("lightning_logs"), config=args, log_model=False)
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
     logger=wandb_logger,
-    callbacks=[checkpoint_callback, early_stopping_callback],
+    callbacks=[checkpoint_callback, early_stopping_callback, validation_step_callback],
     log_every_n_steps=10,
     detect_anomaly=False
 )
 
 # Start training
 trainer.fit(model=model, datamodule=datamodule)
+
