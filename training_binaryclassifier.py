@@ -61,7 +61,7 @@ trainer = pl.Trainer(
 )
 
 # Inizializzazione Wandb
-wandb.init(project='ORDNA_Class', config=args)
+wandb.init(project='ORDNA_Class_july', config=args)
 
 # Start training
 trainer.fit(model=model, datamodule=datamodule)
