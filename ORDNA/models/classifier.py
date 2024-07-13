@@ -6,18 +6,6 @@ from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 import wandb
 
-def calculate_class_weights(dataset, num_classes):
-    print("Calculating class weights...")
-    labels = []
-    for _, _, label in dataset:
-        labels.append(label)
-    labels = torch.tensor(labels)
-    class_counts = torch.bincount(labels, minlength=num_classes)
-    class_weights = 1.0 / class_counts.float()
-    class_weights = class_weights / class_weights.sum() * num_classes  # Normalize weights
-    print("Class weights calculated.")
-    return class_weights
-
 class OrdinalCrossEntropyLoss(nn.Module):
     def __init__(self, num_classes, class_weights=None):
         super(OrdinalCrossEntropyLoss, self).__init__()
@@ -42,10 +30,10 @@ class OrdinalCrossEntropyLoss(nn.Module):
         return loss.mean()
 
 class Classifier(pl.LightningModule):
-    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, train_dataset=None):
+    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
         super().__init__()
         print("Initializing Classifier...")
-        self.save_hyperparameters(ignore=['barlow_twins_model', 'train_dataset'])
+        self.save_hyperparameters(ignore=['barlow_twins_model'])
         self.barlow_twins_model = barlow_twins_model.eval()
         self.num_classes = num_classes
         for param in self.barlow_twins_model.parameters():
@@ -59,12 +47,7 @@ class Classifier(pl.LightningModule):
             nn.Linear(256, num_classes)
         )
         print("Classifier layers defined successfully.")
-        if train_dataset is not None:
-            print("Calculating class weights...")
-            self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device)
-            print("Class weights calculated.")
-        else:
-            self.class_weights = None
+        self.class_weights = class_weights
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
         print("Loss function defined.")
         self.train_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
