@@ -7,7 +7,6 @@ from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
-import wandb
 
 # Controllo se la GPU è disponibile
 if torch.cuda.is_available():
@@ -31,9 +30,6 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
                                    sequence_length=args.sequence_length, 
                                    sample_subset_size=args.sample_subset_size,
                                    batch_size=args.batch_size)
-
-print("Setting up data module...")
-datamodule.setup(stage='fit')  # Ensure train_dataset is defined
 
 print("Loading Barlow Twins model...")
 # Carica il modello Barlow Twins addestrato
@@ -72,31 +68,16 @@ early_stopping_callback = EarlyStopping(
     check_on_train_epoch_end=False  # Check on validation steps
 )
 
-# Callback for validation on each step
-class ValidationOnStepCallback(pl.Callback):
-    def on_validation_epoch_start(self, trainer, pl_module):
-        datamodule = trainer.datamodule
-        val_dataloader = datamodule.val_dataloader()
-        for batch in val_dataloader:
-            pl_module.validation_step(batch, batch_idx=None)
-
 print("Setting up Wandb logger...")
 # Setup logger e trainer
 wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=Path("lightning_logs"), config=args, log_model=False)
-
-# Inizializzazione Wandb
-print("Initializing Wandb run...")
-wandb_run = wandb.init(project='ORDNA_Class_july', config=args)
-
-# Print Wandb run URL
-print(f"Wandb run URL: {wandb_run.url}")
 
 print("Initializing trainer...")
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
     logger=wandb_logger,
-    callbacks=[checkpoint_callback, early_stopping_callback, ValidationOnStepCallback()],
+    callbacks=[checkpoint_callback, early_stopping_callback],
     log_every_n_steps=10,
     detect_anomaly=False
 )
@@ -104,7 +85,3 @@ trainer = pl.Trainer(
 # Start training
 print("Starting training...")
 trainer.fit(model=model, datamodule=datamodule)
-
-# Chiudi Wandb
-print("Finishing Wandb run...")
-wandb.finish()
