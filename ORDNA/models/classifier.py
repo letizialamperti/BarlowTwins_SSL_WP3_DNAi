@@ -7,6 +7,7 @@ from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 import wandb
 
 def calculate_class_weights(dataset, num_classes):
+    print("Calculating class weights...")
     labels = []
     for _, _, label in dataset:
         labels.append(label)
@@ -14,6 +15,7 @@ def calculate_class_weights(dataset, num_classes):
     class_counts = torch.bincount(labels, minlength=num_classes)
     class_weights = 1.0 / class_counts.float()
     class_weights = class_weights / class_weights.sum() * num_classes  # Normalize weights
+    print("Class weights calculated.")
     return class_weights
 
 class OrdinalCrossEntropyLoss(nn.Module):
@@ -42,11 +44,13 @@ class OrdinalCrossEntropyLoss(nn.Module):
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, train_dataset=None):
         super().__init__()
+        print("Initializing Classifier...")
         self.save_hyperparameters(ignore=['barlow_twins_model', 'train_dataset'])
         self.barlow_twins_model = barlow_twins_model.eval()
         self.num_classes = num_classes
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
+        print("Defining classifier layers...")
         self.classifier = nn.Sequential(
             nn.Linear(sample_repr_dim, 256),  # Modificato per avere un solo layer con 256 pesi
             nn.BatchNorm1d(256),
@@ -54,8 +58,15 @@ class Classifier(pl.LightningModule):
             nn.Dropout(0.5),
             nn.Linear(256, num_classes)
         )
-        self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device) if train_dataset is not None else None
+        print("Classifier layers defined successfully.")
+        if train_dataset is not None:
+            print("Calculating class weights...")
+            self.class_weights = calculate_class_weights(train_dataset, num_classes).to(self.device)
+            print("Class weights calculated.")
+        else:
+            self.class_weights = None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
+        print("Loss function defined.")
         self.train_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
         self.val_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
         self.train_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=num_classes)
@@ -64,9 +75,12 @@ class Classifier(pl.LightningModule):
         self.val_precision = Precision(task="multiclass", num_classes=num_classes)
         self.train_recall = Recall(task="multiclass", num_classes=num_classes)
         self.val_recall = Recall(task="multiclass", num_classes=num_classes)
+        print("Classifier initialization complete.")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        print("Forward pass through Barlow Twins model...")
         sample_repr = self.barlow_twins_model.repr_module(x)
+        print("Forward pass through classifier layers...")
         return self.classifier(sample_repr)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
@@ -122,6 +136,8 @@ class Classifier(pl.LightningModule):
         self.logger.experiment.log({f"{stage}_conf_matrix": wandb.Image(fig)})
 
     def configure_optimizers(self):
+        print("Configuring optimizers...")
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate, weight_decay=1e-4)
         scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=self.hparams.initial_learning_rate, total_steps=self.trainer.estimated_stepping_batches)
+        print("Optimizer configured.")
         return [optimizer], [scheduler]
