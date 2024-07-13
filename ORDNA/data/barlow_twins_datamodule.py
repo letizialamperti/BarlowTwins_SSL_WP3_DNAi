@@ -24,7 +24,7 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
                 sample_subset_size=self.sample_subset_size,
                 sequence_length=self.sequence_length
             )
-            print("Train dataset loaded.")
+            print("Train dataset loaded. Number of samples:", len(self.train_dataset))
 
             print("Loading validation dataset...")
             self.val_dataset = BarlowTwinsDataset(
@@ -33,7 +33,7 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
                 sample_subset_size=self.sample_subset_size,
                 sequence_length=self.sequence_length
             )
-            print("Validation dataset loaded.")
+            print("Validation dataset loaded. Number of samples:", len(self.val_dataset))
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
@@ -54,22 +54,3 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
             pin_memory=torch.cuda.is_available(), 
             drop_last=False
         )
-
-    def calculate_class_weights(self, num_classes):
-        print("Calculating class weights...")
-        labels = []
-        try:
-            for idx, (_, _, label) in enumerate(self.train_dataset):
-                print(f"Processing sample {idx} with label {label}")
-                labels.append(label)
-        except Exception as e:
-            print(f"Error while processing sample {idx}: {e}")
-            raise
-        labels = torch.tensor(labels)
-        print(f"All labels: {labels}")
-        class_counts = torch.bincount(labels, minlength=num_classes)
-        print(f"Class counts: {class_counts}")
-        class_weights = 1.0 / class_counts.float()
-        class_weights = class_weights / class_weights.sum() * num_classes  # Normalize weights
-        print(f"Class weights: {class_weights}")
-        return class_weights
