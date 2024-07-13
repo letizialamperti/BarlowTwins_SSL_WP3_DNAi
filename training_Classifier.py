@@ -7,6 +7,7 @@ from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
+import wandb
 
 # Controllo se la GPU è disponibile
 if torch.cuda.is_available():
