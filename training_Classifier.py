@@ -7,6 +7,18 @@ from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
+import pandas as pd
+
+def calculate_class_weights_from_csv(labels_file: Path, num_classes: int):
+    print("Calculating class weights from CSV...")
+    labels_df = pd.read_csv(labels_file)
+    labels = labels_df['label'].values
+    labels = torch.tensor(labels)
+    class_counts = torch.bincount(labels, minlength=num_classes)
+    class_weights = 1.0 / class_counts.float()
+    class_weights = class_weights / class_weights.sum() * num_classes  # Normalize weights
+    print(f"Class weights: {class_weights}")
+    return class_weights
 
 # Controllo se la GPU è disponibile
 if torch.cuda.is_available():
@@ -34,8 +46,8 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
 print("Setting up data module...")
 datamodule.setup(stage='fit')  # Ensure train_dataset is defined
 
-print("Calculating class weights...")
-class_weights = datamodule.calculate_class_weights(num_classes=args.num_classes)
+print("Calculating class weights from CSV...")
+class_weights = calculate_class_weights_from_csv(Path(args.labels_file).resolve(), num_classes=args.num_classes)
 
 print("Loading Barlow Twins model...")
 # Carica il modello Barlow Twins addestrato
