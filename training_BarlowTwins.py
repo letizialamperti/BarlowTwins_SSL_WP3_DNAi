@@ -36,7 +36,7 @@ checkpoint_dir.mkdir(parents=True, exist_ok=True)
 checkpoint_callback = ModelCheckpoint(
     monitor='val_barlow_loss',
     dirpath=checkpoint_dir,
-    filename='BT_model_bigdataset-{epoch:02d}',
+    filename='BT_model_corse-{epoch:02d}',
     save_top_k=3,
     mode='min',
 )
