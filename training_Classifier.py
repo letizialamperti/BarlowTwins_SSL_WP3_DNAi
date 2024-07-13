@@ -2,19 +2,18 @@ import torch
 import pytorch_lightning as pl
 from pathlib import Path
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping  # Import EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
-import wandb  # Import Wandb
+import wandb
 
 # Controllo se la GPU è disponibile
 if torch.cuda.is_available():
     print(f"GPU is available. Device: {torch.cuda.get_device_name(0)}")
 else:
     print("GPU not available, using CPU.")
-
 
 # Usa la stessa configurazione
 args = get_args()
@@ -33,12 +32,9 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
                                    sample_subset_size=args.sample_subset_size,
                                    batch_size=args.batch_size)
 
-
-
-
 print("Loading Barlow Twins model...")
 # Carica il modello Barlow Twins addestrato
-barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model-epoch=01-v1.ckpt") #dataset 460
+barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model-epoch=01-v1.ckpt")
 
 print("Initializing classifier model...")
 # Crea il classificatore con il modello Barlow Twins congelato
