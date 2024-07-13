@@ -73,7 +73,10 @@ early_stopping_callback = EarlyStopping(
 
 print("Setting up Wandb logger...")
 # Setup logger e trainer
-wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=Path("lightning_logs"), config=args, log_model=False)
+wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=str(Path("lightning_logs")), config=args, log_model=False)
+
+# Debug: Print Wandb logger info
+print(f"Wandb logger initialized with project: {wandb_logger.experiment.project}")
 
 print("Initializing trainer...")
 trainer = pl.Trainer(
@@ -84,6 +87,9 @@ trainer = pl.Trainer(
     log_every_n_steps=10,
     detect_anomaly=False
 )
+
+# Debug: Print trainer info
+print(f"Trainer initialized with logger: {trainer.logger}")
 
 # Start training
 print("Starting training...")
