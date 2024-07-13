@@ -26,13 +26,6 @@ LABELS_FILE="label/ordinal_label_Sud_Corse.csv"
 echo "Starting the training process."
 export CUDA_LAUNCH_BLOCKING=1
 
-# Debug: Print environment variables
-echo "Environment variables:"
-env
-
-# Debug: Check if Wandb is installed
-echo "Checking Wandb installation:"
-pip show wandb
 
 srun -ul $HOME/miniconda3/envs/diaus_1/bin/python training_Classifier.py \
     --arg_log True \
