@@ -7,7 +7,6 @@ from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
-import wandb
 
 # Controllo se la GPU è disponibile
 if torch.cuda.is_available():
@@ -35,6 +34,9 @@ datamodule = BarlowTwinsDataModule(samples_dir=samples_dir,
 print("Setting up data module...")
 datamodule.setup(stage='fit')  # Ensure train_dataset is defined
 
+print("Calculating class weights...")
+class_weights = datamodule.calculate_class_weights(num_classes=args.num_classes)
+
 print("Loading Barlow Twins model...")
 # Carica il modello Barlow Twins addestrato
 barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model-epoch=01-v1.ckpt")
@@ -45,7 +47,7 @@ model = Classifier(barlow_twins_model=barlow_twins_model,
                    sample_repr_dim=args.sample_repr_dim, 
                    num_classes=args.num_classes, 
                    initial_learning_rate=args.initial_learning_rate,
-                   train_dataset=datamodule.get_train_dataset())
+                   class_weights=class_weights)
 
 print("Setting up checkpoint directory...")
 # Checkpoint directory
@@ -75,9 +77,6 @@ early_stopping_callback = EarlyStopping(
 print("Setting up Wandb logger...")
 # Setup logger e trainer
 wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=str(Path("lightning_logs")), config=args, log_model=False)
-
-# Debug: Print Wandb logger info
-print(f"Wandb logger initialized with project: {wandb_logger.experiment.project}")
 
 print("Initializing trainer...")
 trainer = pl.Trainer(
