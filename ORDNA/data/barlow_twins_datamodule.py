@@ -51,15 +51,26 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
             drop_last=False
         )
 
+
+        
     def calculate_class_weights(self, num_classes):
         print("Calculating class weights...")
-        labels = []
-        for _, _, label in self.train_dataset:
-            labels.append(label)
+        
+        # Otteniamo tutte le etichette in un solo passaggio
+        labels = [label for _, _, label in self.train_dataset]
+        
+        # Convertiamo le etichette in un tensor di PyTorch
         labels = torch.tensor(labels)
+        
+        # Contiamo le occorrenze di ogni classe
         class_counts = torch.bincount(labels, minlength=num_classes)
+        
+        # Calcoliamo i pesi delle classi
         class_weights = 1.0 / class_counts.float()
-        class_weights = class_weights / class_weights.sum() * num_classes  # Normalize weights
+        
+        # Normalizziamo i pesi
+        class_weights = class_weights / class_weights.sum() * num_classes  
+        
         print(f"Class weights: {class_weights}")
-        return class_weights
+        return class_weights    
 
