@@ -1,4 +1,8 @@
+import pytorch_lightning as pl
 from torch.utils.data import DataLoader
+from typing import Optional
+from pathlib import Path
+from ORDNA.data.barlow_twins_dataset import BarlowTwinsDataset
 import torch
 
 class BarlowTwinsDataModule(pl.LightningDataModule):
@@ -58,3 +62,4 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
         class_weights = class_weights / class_weights.sum() * num_classes  # Normalize weights
         print(f"Class weights: {class_weights}")
         return class_weights
+
