@@ -34,14 +34,14 @@ class Classifier(pl.LightningModule):
         super().__init__()
         print("Initializing Classifier...")
         self.save_hyperparameters(ignore=['barlow_twins_model'])
-        self.barlow_twins_model = barlow_twins_model.eval()
+        self.barlow_twins_model = barlow_twins_model.eval().to(self.device)
         self.num_classes = num_classes
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
         print("Defining classifier layers...")
         
         # Debug: Check output dimensions of barlow_twins_model
-        dummy_input = torch.randn(1, sequence_length, token_emb_dim).long().to(self.device)  # Convert to LongTensor
+        dummy_input = torch.randn(1, sequence_length, token_emb_dim).long().to(self.device)  # Convert to LongTensor and move to device
         sample_repr = self.barlow_twins_model.repr_module(dummy_input)
         print(f"Sample representation shape: {sample_repr.shape}")
 
@@ -51,7 +51,7 @@ class Classifier(pl.LightningModule):
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(256, num_classes)
-        )
+        ).to(self.device)
         print("Classifier layers defined successfully.")
         self.class_weights = class_weights.to(self.device) if class_weights is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
@@ -68,7 +68,7 @@ class Classifier(pl.LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         print("Forward pass through Barlow Twins model...")
-        sample_repr = self.barlow_twins_model.repr_module(x)
+        sample_repr = self.barlow_twins_model.repr_module(x.to(self.device))
         print("Forward pass through classifier layers...")
         return self.classifier(sample_repr)
 
