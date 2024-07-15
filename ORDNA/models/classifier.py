@@ -24,13 +24,13 @@ class OrdinalCrossEntropyLoss(nn.Module):
         prob = torch.clamp(prob, min=epsilon, max=1-epsilon)
         if self.class_weights is not None:
             class_weights = self.class_weights[labels].view(-1, 1).to(labels.device)
-            loss = - (one_hot_labels * torch.log(prob) + (1 - one-hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
+            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
         else:
-            loss = - (one-hot_labels * torch.log(prob) + (1 - one-hot_labels) * torch.log(1 - prob)).sum(dim=1)
+            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1)
         return loss.mean()
 
 class Classifier(pl.LightningModule):
-    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, num_classes: int, sequence_length: int, token_emb_dim: int, initial_learning_rate: float = 1e-5, class_weights=None):
+    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_emb_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
         super().__init__()
         print("Initializing Classifier...")
         self.save_hyperparameters(ignore=['barlow_twins_model'])
@@ -40,13 +40,6 @@ class Classifier(pl.LightningModule):
             param.requires_grad = False
         self.barlow_twins_model = self.barlow_twins_model.to(self.device)  # Ensure model is on the correct device
         print("Defining classifier layers...")
-
-        # Genera un input dummy per determinare la dimensione dell'output
-        dummy_input = torch.randint(0, 4, (1, 2, 2, sequence_length, token_emb_dim)).long().to(self.device)  # Convert to LongTensor
-        dummy_output = self.barlow_twins_model(dummy_input)
-        sample_emb_dim = dummy_output.size(-1)
-
-        print(f"Detected sample_emb_dim: {sample_emb_dim}")
 
         self.classifier = nn.Sequential(
             nn.Linear(sample_emb_dim, 256),
