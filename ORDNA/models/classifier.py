@@ -30,7 +30,7 @@ class OrdinalCrossEntropyLoss(nn.Module):
         return loss.mean()
 
 class Classifier(pl.LightningModule):
-    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_emb_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
+    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
         super().__init__()
         print("Initializing Classifier...")
         self.save_hyperparameters(ignore=['barlow_twins_model'])
