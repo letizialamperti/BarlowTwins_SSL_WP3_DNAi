@@ -57,7 +57,6 @@ barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("chec
 print("Initializing classifier model...")
 # Crea il classificatore con il modello Barlow Twins congelato
 model = Classifier(barlow_twins_model=barlow_twins_model, 
-                   sample_emb_dim=args.sample_emb_dim,  # Assicurati di passare sample_emb_dim
                    num_classes=args.num_classes, 
                    initial_learning_rate=args.initial_learning_rate,
                    class_weights=class_weights).to(device)
@@ -108,4 +107,7 @@ print(f"Trainer initialized with logger: {trainer.logger}")
 # Start training
 print("Starting training...")
 trainer.fit(model=model, datamodule=datamodule)
+
+
+
 
