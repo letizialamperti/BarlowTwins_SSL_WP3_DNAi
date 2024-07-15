@@ -38,33 +38,33 @@ class Classifier(pl.LightningModule):
         self.num_classes = num_classes
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
-        self.barlow_twins_model = self.barlow_twins_model.to(self.device)  # Ensure model is on the correct device
         print("Defining classifier layers...")
 
         self.classifier = nn.Sequential(
-            nn.Linear(sample_emb_dim, 256),
+            nn.Linear(sample_emb_dim, 256),  # Modificato per avere un solo layer con 256 pesi
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(256, self.num_classes)
+            nn.Linear(256, num_classes)
         ).to(self.device)
         print("Classifier layers defined successfully.")
         self.class_weights = class_weights.to(self.device) if class_weights is not None else None
-        self.loss_fn = OrdinalCrossEntropyLoss(self.num_classes, self.class_weights)
+        self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
         print("Loss function defined.")
-        self.train_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes).to(self.device)
-        self.val_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes).to(self.device)
-        self.train_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=self.num_classes).to(self.device)
-        self.val_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=self.num_classes).to(self.device)
-        self.train_precision = Precision(task="multiclass", num_classes=self.num_classes).to(self.device)
-        self.val_precision = Precision(task="multiclass", num_classes=self.num_classes).to(self.device)
-        self.train_recall = Recall(task="multiclass", num_classes=self.num_classes).to(self.device)
-        self.val_recall = Recall(task="multiclass", num_classes=self.num_classes).to(self.device)
+        self.train_accuracy = Accuracy(task="multiclass", num_classes=num_classes).to(self.device)
+        self.val_accuracy = Accuracy(task="multiclass", num_classes=num_classes).to(self.device)
+        self.train_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=num_classes).to(self.device)
+        self.val_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=num_classes).to(self.device)
+        self.train_precision = Precision(task="multiclass", num_classes=num_classes).to(self.device)
+        self.val_precision = Precision(task="multiclass", num_classes=num_classes).to(self.device)
+        self.train_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
+        self.val_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
         print("Classifier initialization complete.")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         print("Forward pass through Barlow Twins model...")
-        sample_repr = self.barlow_twins_model(x.to(self.device))
+        sample_repr = self.barlow_twins_model.repr_module(x.to(self.device))
+        print(f"Sample representation shape: {sample_repr.shape}")
         print("Forward pass through classifier layers...")
         return self.classifier(sample_repr)
 
@@ -102,12 +102,12 @@ class Classifier(pl.LightningModule):
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.val_accuracy(combined_preds, combined_labels)
-        self.log('val_accuracy', accuracy, on_step=True, on_epoch=True)
-        self.log('val_loss', class_loss, on_step=True, on_epoch=True)
+        self.log('val_accuracy', accuracy, on_epoch=True)
+        self.log('val_loss', class_loss, on_epoch=True)
         precision = self.val_precision(combined_preds, combined_labels)
-        self.log('val_precision', precision, on_step=True, on_epoch=True)
+        self.log('val_precision', precision, on_epoch=True)
         recall = self.val_recall(combined_preds, combined_labels)
-        self.log('val_recall', recall, on_step=True, on_epoch=True)
+        self.log('val_recall', recall, on_epoch=True)
         return class_loss
 
     def log_conf_matrix(self, conf_matrix, stage):
