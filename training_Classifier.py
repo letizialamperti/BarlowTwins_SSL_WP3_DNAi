@@ -109,7 +109,3 @@ print(f"Trainer initialized with logger: {trainer.logger}")
 print("Starting training...")
 trainer.fit(model=model, datamodule=datamodule)
 
-
-
-
-
