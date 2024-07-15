@@ -53,20 +53,20 @@ class Classifier(pl.LightningModule):
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(256, num_classes)
+            nn.Linear(256, self.num_classes)
         ).to(self.device)
         print("Classifier layers defined successfully.")
         self.class_weights = class_weights.to(self.device) if class_weights is not None else None
-        self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
+        self.loss_fn = OrdinalCrossEntropyLoss(self.num_classes, self.class_weights)
         print("Loss function defined.")
-        self.train_accuracy = Accuracy(task="multiclass", num_classes=num_classes).to(self.device)
-        self.val_accuracy = Accuracy(task="multiclass", num_classes=num_classes).to(self.device)
-        self.train_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=num_classes).to(self.device)
-        self.val_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=num_classes).to(self.device)
-        self.train_precision = Precision(task="multiclass", num_classes=num_classes).to(self.device)
-        self.val_precision = Precision(task="multiclass", num_classes=num_classes).to(self.device)
-        self.train_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
-        self.val_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
+        self.train_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes).to(self.device)
+        self.val_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes).to(self.device)
+        self.train_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=self.num_classes).to(self.device)
+        self.val_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=self.num_classes).to(self.device)
+        self.train_precision = Precision(task="multiclass", num_classes=self.num_classes).to(self.device)
+        self.val_precision = Precision(task="multiclass", num_classes=self.num_classes).to(self.device)
+        self.train_recall = Recall(task="multiclass", num_classes=self.num_classes).to(self.device)
+        self.val_recall = Recall(task="multiclass", num_classes=self.num_classes).to(self.device)
         print("Classifier initialization complete.")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -133,4 +133,3 @@ class Classifier(pl.LightningModule):
         scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=self.hparams.initial_learning_rate, total_steps=self.trainer.estimated_stepping_batches)
         print("Optimizer configured.")
         return [optimizer], [scheduler]
-
