@@ -23,7 +23,7 @@ class OrdinalCrossEntropyLoss(nn.Module):
         epsilon = 1e-9
         prob = torch.clamp(prob, min=epsilon, max=1-epsilon)
         if self.class_weights is not None:
-            class_weights = self.class_weights[labels].view(-1, 1)
+            class_weights = self.class_weights[labels].view(-1, 1).to(labels.device)
             loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
         else:
             loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1)
@@ -39,25 +39,31 @@ class Classifier(pl.LightningModule):
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
         print("Defining classifier layers...")
+        
+        # Debug: Check output dimensions of barlow_twins_model
+        dummy_input = torch.randn(1, self.hparams.sequence_length, self.hparams.token_emb_dim).to(self.device)
+        sample_repr = self.barlow_twins_model.repr_module(dummy_input)
+        print(f"Sample representation shape: {sample_repr.shape}")
+
         self.classifier = nn.Sequential(
-            nn.Linear(sample_repr_dim, 256),  # Modificato per avere un solo layer con 256 pesi
+            nn.Linear(sample_repr.shape[1], 256),  # Use the correct input dimension
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(256, num_classes)
         )
         print("Classifier layers defined successfully.")
-        self.class_weights = class_weights
+        self.class_weights = class_weights.to(self.device) if class_weights is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
         print("Loss function defined.")
-        self.train_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
-        self.val_accuracy = Accuracy(task="multiclass", num_classes=num_classes)
-        self.train_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=num_classes)
-        self.val_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=num_classes)
-        self.train_precision = Precision(task="multiclass", num_classes=num_classes)
-        self.val_precision = Precision(task="multiclass", num_classes=num_classes)
-        self.train_recall = Recall(task="multiclass", num_classes=num_classes)
-        self.val_recall = Recall(task="multiclass", num_classes=num_classes)
+        self.train_accuracy = Accuracy(task="multiclass", num_classes=num_classes).to(self.device)
+        self.val_accuracy = Accuracy(task="multiclass", num_classes=num_classes).to(self.device)
+        self.train_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=num_classes).to(self.device)
+        self.val_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=num_classes).to(self.device)
+        self.train_precision = Precision(task="multiclass", num_classes=num_classes).to(self.device)
+        self.val_precision = Precision(task="multiclass", num_classes=num_classes).to(self.device)
+        self.train_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
+        self.val_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
         print("Classifier initialization complete.")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -70,9 +76,9 @@ class Classifier(pl.LightningModule):
         sample_subset1, sample_subset2, labels = batch
         if torch.any(labels >= self.num_classes):
             raise ValueError("Labels out of range")
+        sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
-        labels = labels.to(self.device)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('class_loss', class_loss, on_step=True, on_epoch=True)
         pred1 = torch.argmax(output1, dim=1)
@@ -91,9 +97,9 @@ class Classifier(pl.LightningModule):
         sample_subset1, sample_subset2, labels = batch
         if torch.any(labels >= self.num_classes):
             raise ValueError("Labels out of range")
+        sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
-        labels = labels.to(self.device)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         pred1 = torch.argmax(output1, dim=1)
         pred2 = torch.argmax(output2, dim=1)
