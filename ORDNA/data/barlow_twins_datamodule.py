@@ -22,45 +22,36 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None) -> None:
         if stage == 'fit' or stage is None:
-            if not hasattr(self, 'train_dataset'):
-                print("Loading train dataset...")
-                self.train_dataset = BarlowTwinsDataset(
-                    samples_dir=self.train_samples_dir,
-                    labels_file=self.labels_file,
-                    sample_subset_size=self.sample_subset_size,
-                    sequence_length=self.sequence_length
-                )
-                print(f"Train dataset loaded. Number of samples: {len(self.train_dataset)}")
+            self.train_dataset = BarlowTwinsDataset(
+                samples_dir=self.train_samples_dir,
+                labels_file=self.labels_file,
+                sample_subset_size=self.sample_subset_size,
+                sequence_length=self.sequence_length
+            )
 
-            if not hasattr(self, 'val_dataset'):
-                print("Loading validation dataset...")
-                self.val_dataset = BarlowTwinsDataset(
-                    samples_dir=self.val_samples_dir,
-                    labels_file=self.labels_file,
-                    sample_subset_size=self.sample_subset_size,
-                    sequence_length=self.sequence_length
-                )
-                print(f"Validation dataset loaded. Number of samples: {len(self.val_dataset)}")
-
-    def get_train_dataset(self):
-        return self.train_dataset
+            self.val_dataset = BarlowTwinsDataset(
+                samples_dir=self.val_samples_dir,
+                labels_file=self.labels_file,
+                sample_subset_size=self.sample_subset_size,
+                sequence_length=self.sequence_length
+            )
 
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
-            dataset=self.train_dataset, 
-            batch_size=self.batch_size, 
-            shuffle=True, 
-            num_workers=12, 
-            pin_memory=torch.cuda.is_available(), 
+            dataset=self.train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=12,
+            pin_memory=torch.cuda.is_available(),
             drop_last=False
         )
 
     def val_dataloader(self) -> DataLoader:
         return DataLoader(
-            dataset=self.val_dataset, 
-            batch_size=self.batch_size, 
-            shuffle=False, 
-            num_workers=12, 
-            pin_memory=torch.cuda.is_available(), 
+            dataset=self.val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=12,
+            pin_memory=torch.cuda.is_available(),
             drop_last=False
         )
