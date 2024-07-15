@@ -12,7 +12,7 @@ import pandas as pd
 def calculate_class_weights_from_csv(labels_file: Path, num_classes: int):
     print("Calculating class weights from CSV...")
     labels_df = pd.read_csv(labels_file)
-    labels = labels_df['protection'].values
+    labels = labels_df['label'].values
     labels = torch.tensor(labels)
     class_counts = torch.bincount(labels, minlength=num_classes)
     class_weights = 1.0 / class_counts.float()
