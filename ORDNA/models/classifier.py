@@ -44,6 +44,9 @@ class Classifier(pl.LightningModule):
         num_tokens = self.barlow_twins_model.token_emb_layer.num_embeddings
         dummy_input = torch.randint(0, num_tokens, (1, sequence_length, token_emb_dim)).long().to(self.device)  # Convert to LongTensor and move to device
 
+        sample_repr = self.barlow_twins_model.repr_module(dummy_input)
+        print(f"Sample representation shape: {sample_repr.shape}")
+
         self.classifier = nn.Sequential(
             nn.Linear(sample_emb_dim, 256),  # Use the correct input dimension
             nn.BatchNorm1d(256),
