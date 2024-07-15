@@ -41,7 +41,7 @@ class Classifier(pl.LightningModule):
         print("Defining classifier layers...")
         
         # Debug: Check output dimensions of barlow_twins_model
-        dummy_input = torch.randn(1, sequence_length, token_emb_dim).to(self.device)
+        dummy_input = torch.randn(1, sequence_length, token_emb_dim).long().to(self.device)  # Convert to LongTensor
         sample_repr = self.barlow_twins_model.repr_module(dummy_input)
         print(f"Sample representation shape: {sample_repr.shape}")
 
