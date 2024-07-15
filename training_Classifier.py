@@ -12,7 +12,7 @@ import pandas as pd
 def calculate_class_weights_from_csv(labels_file: Path, num_classes: int):
     print("Calculating class weights from CSV...")
     labels_df = pd.read_csv(labels_file)
-    labels = labels_df['protection'].values
+    labels = labels_df['label'].values
     labels = torch.tensor(labels)
     class_counts = torch.bincount(labels, minlength=num_classes)
     class_weights = 1.0 / class_counts.float()
@@ -21,6 +21,7 @@ def calculate_class_weights_from_csv(labels_file: Path, num_classes: int):
     return class_weights
 
 # Controllo se la GPU è disponibile
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if torch.cuda.is_available():
     print(f"GPU is available. Device: {torch.cuda.get_device_name(0)}")
 else:
@@ -51,17 +52,17 @@ class_weights = calculate_class_weights_from_csv(Path(args.labels_file).resolve(
 
 print("Loading Barlow Twins model...")
 # Carica il modello Barlow Twins addestrato
-barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model_corse-epoch=00.ckpt")
+barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model-epoch=01-v1.ckpt").to(device)
 
 print("Initializing classifier model...")
 # Crea il classificatore con il modello Barlow Twins congelato
 model = Classifier(barlow_twins_model=barlow_twins_model, 
-                   sample_repr_dim=args.sample_repr_dim, 
+                   sample_emb_dim=args.sample_emb_dim,  # Assicurati di passare sample_emb_dim
                    num_classes=args.num_classes, 
                    sequence_length=args.sequence_length,
                    token_emb_dim=args.token_emb_dim,
                    initial_learning_rate=args.initial_learning_rate,
-                   class_weights=class_weights)
+                   class_weights=class_weights).to(device)
 
 print("Setting up checkpoint directory...")
 # Checkpoint directory
@@ -95,6 +96,7 @@ wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=str(Path("lightn
 print("Initializing trainer...")
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
+    devices=1,
     max_epochs=args.max_epochs,
     logger=wandb_logger,
     callbacks=[checkpoint_callback, early_stopping_callback],
