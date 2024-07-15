@@ -34,14 +34,16 @@ class Classifier(pl.LightningModule):
         super().__init__()
         print("Initializing Classifier...")
         self.save_hyperparameters(ignore=['barlow_twins_model'])
-        self.barlow_twins_model = barlow_twins_model.eval().to(self.device)
+        self.barlow_twins_model = barlow_twins_model.eval()
         self.num_classes = num_classes
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
         print("Defining classifier layers...")
-        
-        # Debug: Check output dimensions of barlow_twins_model
-        dummy_input = torch.randn(1, sequence_length, token_emb_dim).long().to(self.device)  # Convert to LongTensor and move to device
+
+        # Generate a dummy input with valid indices for embedding
+        num_tokens = self.barlow_twins_model.token_emb_layer.num_embeddings
+        dummy_input = torch.randint(0, num_tokens, (1, sequence_length, token_emb_dim)).long().to(self.device)  # Convert to LongTensor and move to device
+
         sample_repr = self.barlow_twins_model.repr_module(dummy_input)
         print(f"Sample representation shape: {sample_repr.shape}")
 
