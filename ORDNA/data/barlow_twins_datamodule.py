@@ -36,6 +36,13 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
                 sequence_length=self.sequence_length
             )
 
+    def collate_fn(self, batch):
+        sequences = torch.stack([item[0] for item in batch])
+        labels = torch.tensor([item[1] for item in batch])
+        batch_size, N, L, T = sequences.size()
+        sequences = sequences.view(batch_size, N, 2, L, T)
+        return sequences, labels
+
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
             dataset=self.train_dataset,
@@ -43,7 +50,8 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
             shuffle=True,
             num_workers=12,
             pin_memory=torch.cuda.is_available(),
-            drop_last=False
+            drop_last=False,
+            collate_fn=self.collate_fn
         )
 
     def val_dataloader(self) -> DataLoader:
@@ -53,5 +61,6 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
             shuffle=False,
             num_workers=12,
             pin_memory=torch.cuda.is_available(),
-            drop_last=False
+            drop_last=False,
+            collate_fn=self.collate_fn
         )
