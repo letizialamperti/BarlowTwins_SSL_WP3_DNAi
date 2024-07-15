@@ -42,7 +42,7 @@ class Classifier(pl.LightningModule):
         print("Defining classifier layers...")
 
         # Genera un input dummy per determinare la dimensione dell'output
-        dummy_input = torch.randint(0, 4, (1, sequence_length, token_emb_dim)).long().to(self.device)  # Convert to LongTensor
+        dummy_input = torch.randint(0, 4, (1, 2, 2, sequence_length, token_emb_dim)).long().to(self.device)  # Convert to LongTensor
         dummy_output = self.barlow_twins_model(dummy_input)
         sample_emb_dim = dummy_output.size(-1)
 
