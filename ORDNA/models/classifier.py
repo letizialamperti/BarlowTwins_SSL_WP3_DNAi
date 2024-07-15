@@ -30,7 +30,7 @@ class OrdinalCrossEntropyLoss(nn.Module):
         return loss.mean()
 
 class Classifier(pl.LightningModule):
-    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_emb_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
+    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
         super().__init__()
         print("Initializing Classifier...")
         self.save_hyperparameters(ignore=['barlow_twins_model'])
@@ -40,10 +40,15 @@ class Classifier(pl.LightningModule):
             param.requires_grad = False
         print("Defining classifier layers...")
 
-        # Remove the dummy input part since it's not needed
+        # Genera un input dummy per determinare la dimensione dell'output
+        dummy_input = torch.randn(1, 300, 8)  # Modifica con i valori appropriati di sequence_length e token_emb_dim
+        dummy_output = self.barlow_twins_model(dummy_input)
+        sample_emb_dim = dummy_output.size(-1)
+
+        print(f"Detected sample_emb_dim: {sample_emb_dim}")
 
         self.classifier = nn.Sequential(
-            nn.Linear(sample_emb_dim, 256),  # Use the correct input dimension
+            nn.Linear(sample_emb_dim, 256),  # Usa sample_emb_dim come dimensione di input
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
@@ -65,7 +70,7 @@ class Classifier(pl.LightningModule):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         print("Forward pass through Barlow Twins model...")
-        sample_repr = self.barlow_twins_model.repr_module(x.to(self.device))
+        sample_repr = self.barlow_twins_model(x.to(self.device))
         print("Forward pass through classifier layers...")
         return self.classifier(sample_repr)
 
