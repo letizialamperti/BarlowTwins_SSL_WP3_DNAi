@@ -110,3 +110,6 @@ print("Starting training...")
 trainer.fit(model=model, datamodule=datamodule)
 
 
+
+
+
