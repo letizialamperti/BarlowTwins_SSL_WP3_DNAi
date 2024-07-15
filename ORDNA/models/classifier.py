@@ -24,13 +24,13 @@ class OrdinalCrossEntropyLoss(nn.Module):
         prob = torch.clamp(prob, min=epsilon, max=1-epsilon)
         if self.class_weights is not None:
             class_weights = self.class_weights[labels].view(-1, 1).to(labels.device)
-            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
+            loss = - (one_hot_labels * torch.log(prob) + (1 - one-hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
         else:
-            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1)
+            loss = - (one-hot_labels * torch.log(prob) + (1 - one-hot_labels) * torch.log(1 - prob)).sum(dim=1)
         return loss.mean()
 
 class Classifier(pl.LightningModule):
-    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_repr_dim: int, num_classes: int, sequence_length: int, token_emb_dim: int, initial_learning_rate: float = 1e-5, class_weights=None):
+    def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_emb_dim: int, num_classes: int, sequence_length: int, token_emb_dim: int, initial_learning_rate: float = 1e-5, class_weights=None):
         super().__init__()
         print("Initializing Classifier...")
         self.save_hyperparameters(ignore=['barlow_twins_model'])
@@ -44,11 +44,8 @@ class Classifier(pl.LightningModule):
         num_tokens = self.barlow_twins_model.token_emb_layer.num_embeddings
         dummy_input = torch.randint(0, num_tokens, (1, sequence_length, token_emb_dim)).long().to(self.device)  # Convert to LongTensor and move to device
 
-        sample_repr = self.barlow_twins_model.repr_module(dummy_input)
-        print(f"Sample representation shape: {sample_repr.shape}")
-
         self.classifier = nn.Sequential(
-            nn.Linear(sample_repr.shape[1], 256),  # Use the correct input dimension
+            nn.Linear(sample_emb_dim, 256),  # Use the correct input dimension
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
