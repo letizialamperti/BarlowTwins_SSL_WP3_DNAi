@@ -1,7 +1,7 @@
 import torch
 import os
 import pytorch_lightning as pl
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from typing import Optional
 from pathlib import Path
 from ORDNA.data.barlow_twins_dataset import BarlowTwinsDataset
@@ -18,7 +18,7 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
         self.sample_subset_size = sample_subset_size
         self.batch_size = batch_size
 
-        assert(batch_size is not None)
+        assert(batch_size is not None) 
 
     def setup(self, stage: Optional[str] = None) -> None:
         if stage == 'fit' or stage is None:
@@ -36,31 +36,22 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
                 sequence_length=self.sequence_length
             )
 
-    def collate_fn(self, batch):
-        sequences = torch.stack([item[0] for item in batch])
-        labels = torch.tensor([item[1] for item in batch])
-        batch_size, N, L, T = sequences.size()
-        sequences = sequences.view(batch_size, N, 2, L, T)
-        return sequences, labels
-
     def train_dataloader(self) -> DataLoader:
         return DataLoader(
-            dataset=self.train_dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            num_workers=12,
-            pin_memory=torch.cuda.is_available(),
-            drop_last=False,
-            collate_fn=self.collate_fn
+            dataset=self.train_dataset, 
+            batch_size=self.batch_size, 
+            shuffle=True, 
+            num_workers=12, 
+            pin_memory=torch.cuda.is_available(), 
+            drop_last=False
         )
 
     def val_dataloader(self) -> DataLoader:
         return DataLoader(
-            dataset=self.val_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=12,
-            pin_memory=torch.cuda.is_available(),
-            drop_last=False,
-            collate_fn=self.collate_fn
+            dataset=self.val_dataset, 
+            batch_size=self.batch_size, 
+            shuffle=False, 
+            num_workers=12, 
+            pin_memory=torch.cuda.is_available(), 
+            drop_last=False
         )
