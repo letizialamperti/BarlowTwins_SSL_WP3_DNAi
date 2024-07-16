@@ -1,3 +1,33 @@
+import torch
+import torch.nn as nn
+import pytorch_lightning as pl
+from torch.optim import AdamW
+from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
+from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
+
+class OrdinalCrossEntropyLoss(nn.Module):
+    def __init__(self, num_classes, class_weights=None):
+        super(OrdinalCrossEntropyLoss, self).__init__()
+        self.num_classes = num_classes
+        self.class_weights = class_weights
+
+    def forward(self, logits, labels):
+        logits = logits.to(labels.device)
+        logits = logits.view(-1, self.num_classes)
+        labels = labels.view(-1)
+        cum_probs = torch.sigmoid(logits)
+        cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
+        prob = cum_probs[:, :-1] - cum_probs[:, 1:]
+        one_hot_labels = torch.zeros_like(prob).scatter(1, labels.unsqueeze(1), 1)
+        epsilon = 1e-9
+        prob = torch.clamp(prob, min=epsilon, max=1-epsilon)
+        if self.class_weights is not None:
+            class_weights = self.class_weights[labels].view(-1, 1).to(labels.device)
+            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
+        else:
+            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1)
+        return loss.mean()
+
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_emb_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
         super().__init__()
