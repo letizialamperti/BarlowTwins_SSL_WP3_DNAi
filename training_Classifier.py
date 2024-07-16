@@ -52,7 +52,7 @@ print(f"Class weights: {class_weights}")
 
 print("Loading Barlow Twins model...")
 # Carica il modello Barlow Twins addestrato
-barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_model_corse-epoch=00.ckpt").to(device)
+barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_sud_cose_1_dataset-epoch=00.ckpt").to(device)
 
 print("Initializing classifier model...")
 # Crea il classificatore con il modello Barlow Twins congelato
