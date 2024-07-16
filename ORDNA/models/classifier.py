@@ -32,25 +32,22 @@ class OrdinalCrossEntropyLoss(nn.Module):
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_emb_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
         super().__init__()
-        print("Initializing Classifier...")
         self.save_hyperparameters(ignore=['barlow_twins_model'])
         self.barlow_twins_model = barlow_twins_model.eval()
         self.num_classes = num_classes
         for param in self.barlow_twins_model.parameters():
             param.requires_grad = False
-        print("Defining classifier layers...")
-
+        
         self.classifier = nn.Sequential(
-            nn.Linear(sample_emb_dim, 256),  # Modificato per avere un solo layer con 256 pesi
+            nn.Linear(sample_emb_dim, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(256, num_classes)
         ).to(self.device)
-        print("Classifier layers defined successfully.")
+        
         self.class_weights = class_weights.to(self.device) if class_weights is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
-        print("Loss function defined.")
         self.train_accuracy = Accuracy(task="multiclass", num_classes=num_classes).to(self.device)
         self.val_accuracy = Accuracy(task="multiclass", num_classes=num_classes).to(self.device)
         self.train_conf_matrix = ConfusionMatrix(task="multiclass", num_classes=num_classes).to(self.device)
@@ -59,19 +56,13 @@ class Classifier(pl.LightningModule):
         self.val_precision = Precision(task="multiclass", num_classes=num_classes).to(self.device)
         self.train_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
         self.val_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
-        print("Classifier initialization complete.")
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        print("Forward pass through Barlow Twins model...")
-        sample_repr = self.barlow_twins_model.repr_module(x.to(self.device))
-        print(f"Sample representation shape: {sample_repr.shape}")
-        print("Forward pass through classifier layers...")
-        return self.classifier(sample_repr)
+        sample_emb = self.barlow_twins_model(x.to(self.device))  # Utilizza l'output completo del modello Barlow Twins
+        return self.classifier(sample_emb)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
-        if torch.any(labels >= self.num_classes):
-            raise ValueError("Labels out of range")
         sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
@@ -91,8 +82,6 @@ class Classifier(pl.LightningModule):
 
     def validation_step(self, batch, batch_idx: int):
         sample_subset1, sample_subset2, labels = batch
-        if torch.any(labels >= self.num_classes):
-            raise ValueError("Labels out of range")
         sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
@@ -110,19 +99,7 @@ class Classifier(pl.LightningModule):
         self.log('val_recall', recall, on_epoch=True)
         return class_loss
 
-    def log_conf_matrix(self, conf_matrix, stage):
-        conf_matrix = conf_matrix.cpu().numpy()
-        fig, ax = plt.subplots(figsize=(8, 6))
-        sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues', xticklabels=range(self.num_classes), yticklabels=range(self.num_classes))
-        ax.set_xlabel('Predicted Labels')
-        ax.set_ylabel('True Labels')
-        ax.set_title(f'{stage.capitalize()} Confusion Matrix')
-        plt.close(fig)
-        self.logger.experiment.log({f"{stage}_conf_matrix": wandb.Image(fig)})
-
     def configure_optimizers(self):
-        print("Configuring optimizers...")
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate, weight_decay=1e-4)
         scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=self.hparams.initial_learning_rate, total_steps=self.trainer.estimated_stepping_batches)
-        print("Optimizer configured.")
         return [optimizer], [scheduler]
