@@ -90,11 +90,12 @@ early_stopping_callback = EarlyStopping(
 
 # Callback for validation on each step
 class ValidationOnStepCallback(pl.Callback):
-    def on_validation_epoch_start(self, trainer, pl_module):
-        datamodule = trainer.datamodule
-        val_dataloader = datamodule.val_dataloader()
-        for batch in val_dataloader:
-            pl_module.validation_step(batch, batch_idx=None)
+    def __init__(self, n_steps):
+        self.n_steps = n_steps
+
+    def on_batch_end(self, trainer, pl_module):
+        if (trainer.global_step + 1) % self.n_steps == 0:
+            trainer.validate()
 
 print("Setting up Wandb logger...")
 # Setup logger e trainer
@@ -108,11 +109,22 @@ wandb_run = wandb.init(project='ORDNA_Class_july', config=args)
 print(f"Wandb run URL: {wandb_run.url}")
 
 print("Initializing trainer...")
+
+# Parametri del dataset e batch size
+N = len(datamodule.train_dataloader().dataset)  # Numero di campioni di addestramento
+B = args.batch_size  # Batch size
+
+# Calcolare il numero totale di batch per epoca
+num_batches_per_epoch = N // B
+
+# Scegliere n_steps come il 10% dei batch per epoca
+n_steps = num_batches_per_epoch // 10
+
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
     logger=wandb_logger,
-    callbacks=[checkpoint_callback, early_stopping_callback, ValidationOnStepCallback()],
+    callbacks=[checkpoint_callback, early_stopping_callback, ValidationOnStepCallback(n_steps=n_steps)],
     log_every_n_steps=10,
     detect_anomaly=False
 )
