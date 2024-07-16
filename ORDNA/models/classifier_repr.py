@@ -6,6 +6,9 @@ from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 import wandb
 
+#in questa versione viene usato il representationModule (self.barlow_twins_model.repr_module(x.to(self.device))) nel forward per calcolare la rappresentazione del modello BT. Quindi l'input del Classificatore
+#sarà sample_repr_dim
+
 class OrdinalCrossEntropyLoss(nn.Module):
     def __init__(self, num_classes, class_weights=None):
         super(OrdinalCrossEntropyLoss, self).__init__()
