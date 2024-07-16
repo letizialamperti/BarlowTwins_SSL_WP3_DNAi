@@ -1,34 +1,3 @@
-import torch
-import torch.nn as nn
-import pytorch_lightning as pl
-from torch.optim import AdamW
-from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
-from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
-import wandb
-
-class OrdinalCrossEntropyLoss(nn.Module):
-    def __init__(self, num_classes, class_weights=None):
-        super(OrdinalCrossEntropyLoss, self).__init__()
-        self.num_classes = num_classes
-        self.class_weights = class_weights
-
-    def forward(self, logits, labels):
-        logits = logits.to(labels.device)
-        logits = logits.view(-1, self.num_classes)
-        labels = labels.view(-1)
-        cum_probs = torch.sigmoid(logits)
-        cum_probs = torch.cat([cum_probs, torch.ones_like(cum_probs[:, :1])], dim=1)
-        prob = cum_probs[:, :-1] - cum_probs[:, 1:]
-        one_hot_labels = torch.zeros_like(prob).scatter(1, labels.unsqueeze(1), 1)
-        epsilon = 1e-9
-        prob = torch.clamp(prob, min=epsilon, max=1-epsilon)
-        if self.class_weights is not None:
-            class_weights = self.class_weights[labels].view(-1, 1).to(labels.device)
-            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
-        else:
-            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1)
-        return loss.mean()
-
 class Classifier(pl.LightningModule):
     def __init__(self, barlow_twins_model: SelfAttentionBarlowTwinsEmbedder, sample_emb_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
         super().__init__()
@@ -86,17 +55,17 @@ class Classifier(pl.LightningModule):
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-        self.log('val_loss', class_loss, on_epoch=True)
+        self.log('val_loss', class_loss, prog_bar=True, logger=True)
         pred1 = torch.argmax(output1, dim=1)
         pred2 = torch.argmax(output2, dim=1)
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.val_accuracy(combined_preds, combined_labels)
-        self.log('val_accuracy', accuracy, on_epoch=True)
+        self.log('val_accuracy', accuracy, prog_bar=True, logger=True)
         precision = self.val_precision(combined_preds, combined_labels)
-        self.log('val_precision', precision, on_epoch=True)
+        self.log('val_precision', precision, prog_bar=True, logger=True)
         recall = self.val_recall(combined_preds, combined_labels)
-        self.log('val_recall', recall, on_epoch=True)
+        self.log('val_recall', recall, prog_bar=True, logger=True)
         return class_loss
 
     def configure_optimizers(self):
