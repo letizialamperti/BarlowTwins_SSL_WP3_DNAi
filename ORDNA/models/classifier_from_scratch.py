@@ -3,6 +3,7 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from torch.optim import AdamW
 from torchmetrics import Accuracy, ConfusionMatrix, Precision, Recall
+from ORDNA.models.representation_module import SelfAttentionRepresentationModule
 
 class OrdinalCrossEntropyLoss(nn.Module):
     def __init__(self, num_classes, class_weights=None):
@@ -22,19 +23,23 @@ class OrdinalCrossEntropyLoss(nn.Module):
         prob = torch.clamp(prob, min=epsilon, max=1-epsilon)
         if self.class_weights is not None:
             class_weights = self.class_weights[labels].view(-1, 1).to(labels.device)
-            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
+            loss = - (one_hot_labels * torch.log(prob) + (1 - one-hot_labels) * torch.log(1 - prob)).sum(dim=1) * class_weights
         else:
-            loss = - (one_hot_labels * torch.log(prob) + (1 - one_hot_labels) * torch.log(1 - prob)).sum(dim=1)
+            loss = - (one-hot_labels * torch.log(prob) + (1 - one-hot_labels) * torch.log(1 - prob)).sum(dim=1)
         return loss.mean()
 
 class ClassifierFromScratch(pl.LightningModule):
-    def __init__(self, input_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
+    def __init__(self, token_emb_dim: int, seq_len: int, repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
         super().__init__()
         self.save_hyperparameters()
         self.num_classes = num_classes
-        
+
+        # Aggiungi il modulo di rappresentazione
+        self.repr_module = SelfAttentionRepresentationModule(token_emb_dim=token_emb_dim, seq_len=seq_len, repr_dim=repr_dim)
+
+        # Modello del classificatore
         self.classifier = nn.Sequential(
-            nn.Linear(input_dim, 1024),  # Aumenta il numero di neuroni nel primo livello
+            nn.Linear(repr_dim, 1024),
             nn.BatchNorm1d(1024),
             nn.ReLU(),
             nn.Dropout(0.5),
@@ -57,14 +62,15 @@ class ClassifierFromScratch(pl.LightningModule):
         self.val_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        print(f"Input shape: {x.shape}")
-        return self.classifier(x)
+        sample_repr = self.repr_module(x)
+        print(f"Sample representation shape: {sample_repr.shape}")
+        return self.classifier(sample_repr)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
         sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
-        output1 = self(sample_subset1.view(sample_subset1.size(0), -1))  # Flatten the input
-        output2 = self(sample_subset2.view(sample_subset2.size(0), -1))  # Flatten the input
+        output1 = self(sample_subset1)
+        output2 = self(sample_subset2)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('train_class_loss', class_loss, on_step=True, on_epoch=True)
         pred1 = torch.argmax(output1, dim=1)
@@ -82,8 +88,8 @@ class ClassifierFromScratch(pl.LightningModule):
     def validation_step(self, batch, batch_idx: int):
         sample_subset1, sample_subset2, labels = batch
         sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
-        output1 = self(sample_subset1.view(sample_subset1.size(0), -1))  # Flatten the input
-        output2 = self(sample_subset2.view(sample_subset2.size(0), -1))  # Flatten the input
+        output1 = self(sample_subset1)
+        output2 = self(sample_subset2)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('val_class_loss', class_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         pred1 = torch.argmax(output1, dim=1)
