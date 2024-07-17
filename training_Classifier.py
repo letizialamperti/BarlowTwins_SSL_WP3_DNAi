@@ -95,9 +95,11 @@ class ValidationOnStepCallback(pl.Callback):
 
     def on_batch_end(self, trainer, pl_module):
         if (trainer.global_step + 1) % self.n_steps == 0:
-            val_outputs = trainer.validate()
+            print(f"Running validation at step {trainer.global_step + 1}")
+            val_outputs = trainer.validate(datamodule=trainer.datamodule, verbose=False)
             for output in val_outputs:
                 for key, value in output.items():
+                    print(f"Logging {key} with value {value}")
                     pl_module.log(key, value, prog_bar=True, logger=True)
 
 print("Setting up Wandb logger...")
