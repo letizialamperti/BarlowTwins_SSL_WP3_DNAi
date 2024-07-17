@@ -7,8 +7,8 @@
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=12
 #SBATCH --constraint=gpu
-#SBATCH --output=classifier-logfile-%j.log
-#SBATCH --error=classifier-errorfile-%j.err
+#SBATCH --output=scratch_classifier-logfile-%j.log
+#SBATCH --error=scratch_classifier-errorfile-%j.err
 #SBATCH --account=sd29
 
 # Module loading section
