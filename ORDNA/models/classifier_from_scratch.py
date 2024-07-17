@@ -56,32 +56,40 @@ class ClassifierFromScratch(pl.LightningModule):
         return self.classifier(x)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
-        x, labels = batch
-        x, labels = x.to(self.device), labels.to(self.device)
-        output = self(x)
-        class_loss = self.loss_fn(output, labels)
+        sample_subset1, sample_subset2, labels = batch
+        sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
+        output1 = self(sample_subset1)
+        output2 = self(sample_subset2)
+        class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('train_class_loss', class_loss, on_step=True, on_epoch=True)
-        pred = torch.argmax(output, dim=1)
-        accuracy = self.train_accuracy(pred, labels)
+        pred1 = torch.argmax(output1, dim=1)
+        pred2 = torch.argmax(output2, dim=1)
+        combined_preds = torch.cat((pred1, pred2), dim=0)
+        combined_labels = torch.cat((labels, labels), dim=0)
+        accuracy = self.train_accuracy(combined_preds, combined_labels)
         self.log('train_accuracy', accuracy, on_step=True, on_epoch=True)
-        precision = self.train_precision(pred, labels)
+        precision = self.train_precision(combined_preds, combined_labels)
         self.log('train_precision', precision, on_step=True, on_epoch=True)
-        recall = self.train_recall(pred, labels)
+        recall = self.train_recall(combined_preds, combined_labels)
         self.log('train_recall', recall, on_step=True, on_epoch=True)
         return class_loss
 
     def validation_step(self, batch, batch_idx: int):
-        x, labels = batch
-        x, labels = x.to(self.device), labels.to(self.device)
-        output = self(x)
-        class_loss = self.loss_fn(output, labels)
+        sample_subset1, sample_subset2, labels = batch
+        sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
+        output1 = self(sample_subset1)
+        output2 = self(sample_subset2)
+        class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('val_class_loss', class_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        pred = torch.argmax(output, dim=1)
-        accuracy = self.val_accuracy(pred, labels)
+        pred1 = torch.argmax(output1, dim=1)
+        pred2 = torch.argmax(output2, dim=1)
+        combined_preds = torch.cat((pred1, pred2), dim=0)
+        combined_labels = torch.cat((labels, labels), dim=0)
+        accuracy = self.val_accuracy(combined_preds, combined_labels)
         self.log('val_accuracy', accuracy, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        precision = self.val_precision(pred, labels)
+        precision = self.val_precision(combined_preds, combined_labels)
         self.log('val_precision', precision, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        recall = self.val_recall(pred, labels)
+        recall = self.val_recall(combined_preds, combined_labels)
         self.log('val_recall', recall, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return class_loss
 
