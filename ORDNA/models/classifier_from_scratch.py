@@ -34,7 +34,11 @@ class ClassifierFromScratch(pl.LightningModule):
         self.num_classes = num_classes
         
         self.classifier = nn.Sequential(
-            nn.Linear(input_dim, 256),
+            nn.Linear(input_dim, 1024),  # Aumenta il numero di neuroni nel primo livello
+            nn.BatchNorm1d(1024),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(1024, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
