@@ -99,13 +99,14 @@ class ValidationOnStepCallback(pl.Callback):
             val_outputs = trainer.validate(datamodule=trainer.datamodule, verbose=False)
             for output in val_outputs:
                 for key, value in output.items():
+                    print(f"Logging {key} with value {value}")
                     pl_module.log(key, value, prog_bar=True, logger=True)
             # Manually call `log` for each validation metric
             for metric in ['val_class_loss', 'val_accuracy', 'val_precision', 'val_recall']:
                 metric_value = trainer.callback_metrics.get(metric)
                 if metric_value is not None:
+                    print(f"Logging metric {metric} with value {metric_value}")
                     pl_module.log(metric, metric_value, prog_bar=True, logger=True)
-
 
 print("Setting up Wandb logger...")
 # Setup logger e trainer
@@ -124,14 +125,15 @@ print("Initializing trainer...")
 N = len(datamodule.train_dataloader().dataset)  # Numero di campioni di addestramento
 B = args.batch_size  # Batch size
 
-# Verifica del calcolo di n_steps
-num_batches_per_epoch = len(datamodule.train_dataloader())
-n_steps = num_batches_per_epoch // 10  # Ogni 10% dei batch
+# Calcolare il numero totale di batch per epoca
+num_batches_per_epoch = N // B
 
-# Output di debug per verificare il valore di n_steps
+# Scegliere n_steps come il 10% dei batch per epoca
+n_steps = num_batches_per_epoch // 10
+
+# Debug prints for verification
 print(f"Number of batches per epoch: {num_batches_per_epoch}")
 print(f"Validation every {n_steps} steps")
-
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
