@@ -53,13 +53,14 @@ class ClassifierFromScratch(pl.LightningModule):
         self.val_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
+        print(f"Input shape: {x.shape}")
         return self.classifier(x)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
         sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
-        output1 = self(sample_subset1)
-        output2 = self(sample_subset2)
+        output1 = self(sample_subset1.view(sample_subset1.size(0), -1))  # Flatten the input
+        output2 = self(sample_subset2.view(sample_subset2.size(0), -1))  # Flatten the input
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('train_class_loss', class_loss, on_step=True, on_epoch=True)
         pred1 = torch.argmax(output1, dim=1)
@@ -77,8 +78,8 @@ class ClassifierFromScratch(pl.LightningModule):
     def validation_step(self, batch, batch_idx: int):
         sample_subset1, sample_subset2, labels = batch
         sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
-        output1 = self(sample_subset1)
-        output2 = self(sample_subset2)
+        output1 = self(sample_subset1.view(sample_subset1.size(0), -1))  # Flatten the input
+        output2 = self(sample_subset2.view(sample_subset2.size(0), -1))  # Flatten the input
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('val_class_loss', class_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         pred1 = torch.argmax(output1, dim=1)
