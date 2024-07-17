@@ -40,6 +40,6 @@ srun -ul $HOME/miniconda3/envs/diaus_1/bin/python training_Classifier.py \
     --sample_repr_dim 64 \
     --sample_emb_dim 64 \
     --initial_learning_rate 1e-3 \
-    --max_epochs 3
+    --max_epochs 1
 
 echo "Training completed successfully."
