@@ -51,8 +51,9 @@ print(f"Class weights: {class_weights}")
 
 print("Initializing classifier model...")
 # Crea il classificatore da zero
-input_dim = args.sample_subset_size * args.sequence_length  # Assicurati che questo sia corretto
-model = ClassifierFromScratch(input_dim=input_dim, 
+model = ClassifierFromScratch(token_emb_dim=args.token_emb_dim, 
+                              seq_len=args.sequence_length, 
+                              repr_dim=args.sample_repr_dim, 
                               num_classes=args.num_classes, 
                               initial_learning_rate=args.initial_learning_rate,
                               class_weights=class_weights)
