@@ -5,6 +5,7 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
+from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Assicurati di importare correttamente
 from ORDNA.utils.argparser import get_args, write_config_file
 import wandb
 
