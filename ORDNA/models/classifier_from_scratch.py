@@ -32,23 +32,21 @@ class ClassifierFromScratch(pl.LightningModule):
     def __init__(self, token_emb_dim: int, seq_len: int, repr_dim: int, num_classes: int, initial_learning_rate: float = 1e-5, class_weights=None):
         super().__init__()
         self.save_hyperparameters()
+        
+        # Representation module
+        self.repr_module = SelfAttentionRepresentationModule(token_emb_dim=token_emb_dim,
+                                                             seq_len=seq_len,
+                                                             repr_dim=repr_dim)
+        
         self.num_classes = num_classes
-
-        # Aggiungi il modulo di rappresentazione
-        self.repr_module = SelfAttentionRepresentationModule(token_emb_dim=token_emb_dim, seq_len=seq_len, repr_dim=repr_dim)
-
-        # Modello del classificatore
+        
         self.classifier = nn.Sequential(
-            nn.Linear(repr_dim, 1024),
-            nn.BatchNorm1d(1024),
-            nn.ReLU(),
-            nn.Dropout(0.5),
-            nn.Linear(1024, 256),
+            nn.Linear(repr_dim, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(256, num_classes)
-        )
+        ).to(self.device)
         
         self.class_weights = class_weights.to(self.device) if class_weights is not None else None
         self.loss_fn = OrdinalCrossEntropyLoss(num_classes, self.class_weights)
@@ -62,8 +60,7 @@ class ClassifierFromScratch(pl.LightningModule):
         self.val_recall = Recall(task="multiclass", num_classes=num_classes).to(self.device)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        sample_repr = self.repr_module(x)
-        print(f"Sample representation shape: {sample_repr.shape}")
+        sample_repr = self.repr_module(x.to(self.device))  # Utilizza l'output della rappresentazione
         return self.classifier(sample_repr)
 
     def training_step(self, batch, batch_idx: int) -> torch.Tensor:
@@ -92,6 +89,7 @@ class ClassifierFromScratch(pl.LightningModule):
         output2 = self(sample_subset2)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('val_class_loss', class_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_class_loss_step', class_loss, on_step=True, prog_bar=True, logger=True)  # Log on step specifically
         pred1 = torch.argmax(output1, dim=1)
         pred2 = torch.argmax(output2, dim=1)
         combined_preds = torch.cat((pred1, pred2), dim=0)
