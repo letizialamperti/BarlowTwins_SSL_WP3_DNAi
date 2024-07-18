@@ -85,7 +85,8 @@ class Classifier(pl.LightningModule):
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-        self.log('val_class_loss', class_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_class_loss', class_loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)  # Log both on_step and on_epoch
+        self.log('val_class_loss_step', class_loss, on_step=True, prog_bar=True, logger=True)  # Log on step specifically
         pred1 = torch.argmax(output1, dim=1)
         pred2 = torch.argmax(output2, dim=1)
         combined_preds = torch.cat((pred1, pred2), dim=0)
