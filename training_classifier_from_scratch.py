@@ -68,7 +68,7 @@ print("Initializing checkpoint callback...")
 checkpoint_callback = ModelCheckpoint(
     monitor='val_accuracy',  # Ensure this metric is logged in your model
     dirpath=checkpoint_dir,
-    filename='scratch_classifier-{epoch:02d}-{val_accuracy:.2f}',
+    filename='classifier_scratch-{epoch:02d}-{val_accuracy:.2f}',
     save_top_k=3,
     mode='max',
 )
@@ -76,7 +76,7 @@ checkpoint_callback = ModelCheckpoint(
 print("Initializing early stopping callback...")
 # Early stopping callback
 early_stopping_callback = EarlyStopping(
-    monitor='val_class_loss',  # Monitor the correct validation loss
+    monitor='val_class_loss_step',  # Monitor the validation loss on steps
     patience=10,  # Number of validation steps with no improvement after which training will be stopped
     mode='min',
     verbose=True,
@@ -132,6 +132,10 @@ trainer = pl.Trainer(
 # Start training
 print("Starting training...")
 trainer.fit(model=model, datamodule=datamodule)
+
+# Check if early stopping was triggered
+if trainer.should_stop:
+    print("Early stopping was triggered.")
 
 # Chiudi Wandb
 print("Finishing Wandb run...")
