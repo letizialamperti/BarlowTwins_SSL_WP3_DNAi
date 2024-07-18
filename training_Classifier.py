@@ -5,7 +5,6 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
-from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
 import wandb
 
@@ -50,15 +49,13 @@ print("Calculating class weights from CSV...")
 class_weights = calculate_class_weights_from_csv(Path(args.labels_file).resolve(), args.num_classes)
 print(f"Class weights: {class_weights}")
 
-print("Loading Barlow Twins model...")
+print("Initializing classifier model...")
 # Carica il modello Barlow Twins addestrato
 barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_sud_cose_1_dataset-epoch=00.ckpt").to(device)
 
-print("Initializing classifier model...")
 # Crea il classificatore con il modello Barlow Twins congelato
-sample_emb_dim = args.sample_emb_dim  # Assicurati che questo sia corretto
 model = Classifier(barlow_twins_model=barlow_twins_model, 
-                   sample_emb_dim=sample_emb_dim, 
+                   sample_emb_dim=args.sample_emb_dim, 
                    num_classes=args.num_classes, 
                    initial_learning_rate=args.initial_learning_rate,
                    class_weights=class_weights)
@@ -73,7 +70,7 @@ print("Initializing checkpoint callback...")
 checkpoint_callback = ModelCheckpoint(
     monitor='val_accuracy',  # Ensure this metric is logged in your model
     dirpath=checkpoint_dir,
-    filename='corse_classifier-{epoch:02d}-{val_accuracy:.2f}',
+    filename='classifier-{epoch:02d}-{val_accuracy:.2f}',
     save_top_k=3,
     mode='max',
 )
@@ -81,7 +78,7 @@ checkpoint_callback = ModelCheckpoint(
 print("Initializing early stopping callback...")
 # Early stopping callback
 early_stopping_callback = EarlyStopping(
-    monitor='val_class_loss_step',  # Monitor the correct validation loss
+    monitor='val_class_loss_step',  # Monitor the validation loss on steps
     patience=10,  # Number of validation steps with no improvement after which training will be stopped
     mode='min',
     verbose=True,
@@ -100,13 +97,7 @@ class ValidationOnStepCallback(pl.Callback):
             for output in val_outputs:
                 for key, value in output.items():
                     print(f"Logging {key} with value {value}")
-                    pl_module.log(f"{key}_step", value, prog_bar=True, logger=True)
-            # Manually call `log` for each validation metric
-            for metric in ['val_class_loss', 'val_accuracy', 'val_precision', 'val_recall']:
-                metric_value = trainer.callback_metrics.get(metric)
-                if metric_value is not None:
-                    print(f"Logging metric {metric} with value {metric_value}")
-                    pl_module.log(f"{metric}_step", metric_value, prog_bar=True, logger=True)
+                    pl_module.log(key, value, prog_bar=True, logger=True)
 
 print("Setting up Wandb logger...")
 # Setup logger e trainer
@@ -131,10 +122,6 @@ num_batches_per_epoch = N // B
 # Scegliere n_steps come il 10% dei batch per epoca
 n_steps = num_batches_per_epoch // 10
 
-# Debug prints for verification
-print(f"Number of batches per epoch: {num_batches_per_epoch}")
-print(f"Validation every {n_steps} steps")
-
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
@@ -147,6 +134,10 @@ trainer = pl.Trainer(
 # Start training
 print("Starting training...")
 trainer.fit(model=model, datamodule=datamodule)
+
+# Check if early stopping was triggered
+if trainer.should_stop:
+    print("Early stopping was triggered.")
 
 # Chiudi Wandb
 print("Finishing Wandb run...")
