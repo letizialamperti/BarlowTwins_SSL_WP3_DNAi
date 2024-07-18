@@ -100,6 +100,10 @@ class Classifier(pl.LightningModule):
         return class_loss
 
     def configure_optimizers(self):
-        optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate, weight_decay=1e-4)
-        scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer, max_lr=self.hparams.initial_learning_rate, total_steps=self.trainer.estimated_stepping_batches)
-        return [optimizer], [scheduler]
+    optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate, weight_decay=1e-4)
+    scheduler = {
+        'scheduler': torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True),
+        'monitor': 'val_class_loss_step'
+    }
+    return [optimizer], [scheduler]
+
