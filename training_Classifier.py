@@ -81,7 +81,7 @@ checkpoint_callback = ModelCheckpoint(
 print("Initializing early stopping callback...")
 # Early stopping callback
 early_stopping_callback = EarlyStopping(
-    monitor='val_class_loss_step',  # Monitor validation loss on steps
+    monitor='val_class_loss',  # Monitor validation loss on steps
     patience=10,  # Number of validation steps with no improvement after which training will be stopped
     mode='min',
     verbose=True,
@@ -119,8 +119,8 @@ B = args.batch_size  # Batch size
 # Calcolare il numero totale di batch per epoca
 num_batches_per_epoch = N // B
 
-# Scegliere n_steps come il 10% dei batch per epoca
-n_steps = num_batches_per_epoch // 10
+# Scegliere n_steps come il 20% dei batch per epoca
+n_steps = num_batches_per_epoch // 20
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
