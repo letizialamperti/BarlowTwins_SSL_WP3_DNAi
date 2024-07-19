@@ -91,15 +91,11 @@ class ValidationOnStepCallback(pl.Callback):
     def __init__(self, n_steps):
         self.n_steps = n_steps
 
-    def on_batch_end(self, trainer, pl_module):
+    def on_batch_end(self, trainer):
         if (trainer.global_step + 1) % self.n_steps == 0:
             print(f"Running validation at step {trainer.global_step + 1}")
             val_outputs = trainer.validate(datamodule=trainer.datamodule, verbose=False)
-            for output in val_outputs:
-                for key, value in output.items():
-                    print(f"Logging {key} with value {value}")
-                    pl_module.log(key, value, prog_bar=True, logger=True)
-
+            
 print("Setting up Wandb logger...")
 # Setup logger e trainer
 wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=Path("lightning_logs"), config=args, log_model=False)
