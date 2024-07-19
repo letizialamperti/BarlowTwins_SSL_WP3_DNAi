@@ -5,7 +5,7 @@ from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
-from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder  # Assicurati di importare correttamente
+from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
 import wandb
 
@@ -50,13 +50,15 @@ print("Calculating class weights from CSV...")
 class_weights = calculate_class_weights_from_csv(Path(args.labels_file).resolve(), args.num_classes)
 print(f"Class weights: {class_weights}")
 
-print("Initializing classifier model...")
+print("Loading Barlow Twins model...")
 # Carica il modello Barlow Twins addestrato
 barlow_twins_model = SelfAttentionBarlowTwinsEmbedder.load_from_checkpoint("checkpoints/BT_sud_cose_1_dataset-epoch=00.ckpt").to(device)
 
+print("Initializing classifier model...")
 # Crea il classificatore con il modello Barlow Twins congelato
+sample_emb_dim = args.sample_emb_dim  # Assicurati che questo sia corretto
 model = Classifier(barlow_twins_model=barlow_twins_model, 
-                   sample_emb_dim=args.sample_emb_dim, 
+                   sample_emb_dim=sample_emb_dim, 
                    num_classes=args.num_classes, 
                    initial_learning_rate=args.initial_learning_rate,
                    class_weights=class_weights)
@@ -71,7 +73,7 @@ print("Initializing checkpoint callback...")
 checkpoint_callback = ModelCheckpoint(
     monitor='val_accuracy',  # Ensure this metric is logged in your model
     dirpath=checkpoint_dir,
-    filename='classifier-{epoch:02d}-{val_accuracy:.2f}',
+    filename='corse_classifier-{epoch:02d}-{val_accuracy:.2f}',
     save_top_k=3,
     mode='max',
 )
@@ -79,7 +81,7 @@ checkpoint_callback = ModelCheckpoint(
 print("Initializing early stopping callback...")
 # Early stopping callback
 early_stopping_callback = EarlyStopping(
-    monitor='val_class_loss_step',  # Monitor the validation loss on steps
+    monitor='val_class_loss_step',  # Monitor validation loss on steps
     patience=10,  # Number of validation steps with no improvement after which training will be stopped
     mode='min',
     verbose=True,
@@ -91,11 +93,12 @@ class ValidationOnStepCallback(pl.Callback):
     def __init__(self, n_steps):
         self.n_steps = n_steps
 
-    def on_batch_end(self, trainer):
+    def on_batch_end(self, trainer, pl_module):
+        print(f"Global step: {trainer.global_step + 1}")  # Debugging print
         if (trainer.global_step + 1) % self.n_steps == 0:
             print(f"Running validation at step {trainer.global_step + 1}")
-            val_outputs = trainer.validate(datamodule=trainer.datamodule, verbose=False)
-            
+            trainer.validate(model=pl_module, datamodule=trainer.datamodule)
+
 print("Setting up Wandb logger...")
 # Setup logger e trainer
 wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=Path("lightning_logs"), config=args, log_model=False)
