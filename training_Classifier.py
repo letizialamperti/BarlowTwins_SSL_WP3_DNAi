@@ -78,9 +78,19 @@ checkpoint_callback = ModelCheckpoint(
     mode='max',
 )
 
+# Custom Early Stopping callback to stop immediately and perform validation
+class CustomEarlyStopping(EarlyStopping):
+    def on_validation_end(self, trainer, pl_module):
+        super().on_validation_end(trainer, pl_module)
+        if self._run_early_stopping_check(trainer):
+            trainer.should_stop = True
+            print(f"Early stopping triggered at step {trainer.global_step + 1}")
+            # Perform validation immediately
+            trainer.validate(model=pl_module, datamodule=trainer.datamodule)
+
 print("Initializing early stopping callback...")
 # Early stopping callback
-early_stopping_callback = EarlyStopping(
+early_stopping_callback = CustomEarlyStopping(
     monitor='val_accuracy_step',  # Monitor validation accuracy on steps
     patience=10,  # Number of validation steps with no improvement after which training will be stopped
     mode='max',
