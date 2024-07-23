@@ -93,7 +93,7 @@ class Classifier(pl.LightningModule):
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.val_accuracy(combined_preds, combined_labels)
         self.log('val_accuracy', accuracy)
-        self.log('val_accuracy_step', accuracy)
+        self.log('val_accuracy_step', accuracy)  # Log on step specifically
         precision = self.val_precision(combined_preds, combined_labels)
         self.log('val_precision', precision)
         recall = self.val_recall(combined_preds, combined_labels)
