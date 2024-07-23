@@ -81,7 +81,7 @@ checkpoint_callback = ModelCheckpoint(
 print("Initializing early stopping callback...")
 # Early stopping callback
 early_stopping_callback = EarlyStopping(
-    monitor='val_accuracy_step',  # Monitor validation loss on steps
+    monitor='val_accuracy_step',  # Monitor validation accuracy on steps
     patience=10,  # Number of validation steps with no improvement after which training will be stopped
     mode='max',
     verbose=True,
