@@ -139,7 +139,7 @@ trainer = pl.Trainer(
     max_epochs=args.max_epochs,
     logger=wandb_logger,
     callbacks=[checkpoint_callback, early_stopping_callback, validation_callback],
-    log_every_n_steps=10,
+    log_every_n_steps=1,
     detect_anomaly=False
 )
 
