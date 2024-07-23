@@ -96,7 +96,6 @@ class ValidationOnStepCallback(pl.Callback):
     def on_batch_end(self, trainer, pl_module):
         current_step = trainer.global_step + 1
         print(f"[DEBUG] on_batch_end called. Global step: {current_step}, n_steps: {self.n_steps}")  # Debugging print
-        # Check if current_step is a multiple of n_steps
         if current_step % self.n_steps == 0:
             print(f"[DEBUG] Running validation at step {current_step}")
             val_outputs = trainer.validate(model=pl_module, datamodule=trainer.datamodule)
@@ -129,6 +128,8 @@ num_batches_per_epoch = N // B
 
 # Scegliere n_steps come il 20% dei batch per epoca
 n_steps = num_batches_per_epoch // 20
+print(f"Number of batches per epoch: {num_batches_per_epoch}")
+print(f"Validation will run every {n_steps} steps")
 
 # Crea un'istanza del callback
 validation_callback = ValidationOnStepCallback(n_steps=n_steps)
