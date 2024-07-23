@@ -80,8 +80,25 @@ checkpoint_callback = ModelCheckpoint(
 
 print("Initializing early stopping callback...")
 # Early stopping callback
-early_stopping_callback = EarlyStopping(
-    monitor='val_class_loss',  # Monitor validation loss on steps
+class CustomEarlyStopping(EarlyStopping):
+    def on_validation_end(self, trainer, pl_module):
+        logs = trainer.callback_metrics
+        current = logs.get(self.monitor)
+        if current is None:
+            raise RuntimeError(
+                f"Early stopping conditioned on metric `{self.monitor}` "
+                "which is not available. Pass in or modify your `EarlyStopping` "
+                "callback to use any of the following: "
+                f"{', '.join(list(logs.keys()))}"
+            )
+        if self._evaluate_stopping_criteria(current):
+            trainer.should_stop = True
+            print(f"Early stopping triggered at step {trainer.global_step + 1}")
+            trainer.validate(model=pl_module, datamodule=trainer.datamodule)
+            trainer.should_stop = True
+
+early_stopping_callback = CustomEarlyStopping(
+    monitor='val_class_loss_step',  # Monitor validation loss on steps
     patience=10,  # Number of validation steps with no improvement after which training will be stopped
     mode='min',
     verbose=True,
@@ -98,6 +115,11 @@ class ValidationOnStepCallback(pl.Callback):
         if (trainer.global_step + 1) % self.n_steps == 0:
             print(f"Running validation at step {trainer.global_step + 1}")
             trainer.validate(model=pl_module, datamodule=trainer.datamodule)
+            val_outputs = trainer.callback_metrics
+            val_loss = val_outputs.get("val_class_loss_step")
+            val_acc = val_outputs.get("val_accuracy")
+            print(f"Validation loss at step {trainer.global_step + 1}: {val_loss}")
+            print(f"Validation accuracy at step {trainer.global_step + 1}: {val_acc}")
 
 print("Setting up Wandb logger...")
 # Setup logger e trainer
