@@ -91,7 +91,9 @@ early_stopping_callback = EarlyStopping(
 # Callback for validation on each step
 class ValidationOnStepCallback(pl.Callback):
     def __init__(self, n_steps):
+        super().__init__()
         self.n_steps = n_steps
+        print("[DEBUG] ValidationOnStepCallback initialized with n_steps =", n_steps)
 
     def on_batch_end(self, trainer, pl_module):
         current_step = trainer.global_step + 1
