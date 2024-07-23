@@ -39,7 +39,7 @@ srun -ul $HOME/miniconda3/envs/diaus_1/bin/python training_Classifier.py \
     --token_emb_dim 8 \
     --sample_repr_dim 64 \
     --sample_emb_dim 64 \
-    --initial_learning_rate 1e-3 \
+    --initial_learning_rate 1e-4 \
     --max_epochs 2
 
 echo "Training completed successfully."
