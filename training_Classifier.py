@@ -86,7 +86,10 @@ class CustomEarlyStopping(EarlyStopping):
             trainer.should_stop = True
             print(f"Early stopping triggered at step {trainer.global_step + 1}")
             # Perform validation immediately
-            trainer.validate(model=pl_module, datamodule=trainer.datamodule)
+            val_outputs = trainer.validate(model=pl_module, datamodule=trainer.datamodule)
+            val_class_loss = val_outputs[0]['val_class_loss_step']
+            val_accuracy = val_outputs[0]['val_accuracy_step']
+            print(f"Validation at step {trainer.global_step + 1}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
 
 print("Initializing early stopping callback...")
 # Early stopping callback
@@ -110,7 +113,7 @@ class ValidationOnStepCallback(pl.Callback):
             val_outputs = trainer.validate(model=pl_module, datamodule=trainer.datamodule)
             val_class_loss = val_outputs[0]['val_class_loss_step']
             val_accuracy = val_outputs[0]['val_accuracy_step']
-            print(f"Step {trainer.global_step + 1}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
+            print(f"Validation at step {trainer.global_step + 1}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
 
 print("Setting up Wandb logger...")
 # Setup logger e trainer
