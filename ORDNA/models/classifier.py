@@ -41,7 +41,7 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_emb_dim, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(),
-            nn.Dropout(0.5),
+            nn.Dropout(0.6),
             nn.Linear(256, num_classes)
         ).to(self.device)
         
@@ -98,7 +98,6 @@ class Classifier(pl.LightningModule):
         self.log('val_precision', precision)
         recall = self.val_recall(combined_preds, combined_labels)
         self.log('val_recall', recall)
-        print(f"[DEBUG] Validation step - Loss: {class_loss}, Accuracy: {accuracy}")
         return class_loss
 
     def configure_optimizers(self):
