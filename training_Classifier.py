@@ -78,25 +78,12 @@ checkpoint_callback = ModelCheckpoint(
     mode='max',
 )
 
-# Custom Early Stopping callback to stop immediately and perform validation
-class CustomEarlyStopping(EarlyStopping):
-    def on_validation_end(self, trainer, pl_module):
-        super().on_validation_end(trainer, pl_module)
-        if self._run_early_stopping_check(trainer):
-            trainer.should_stop = True
-            print(f"Early stopping triggered at step {trainer.global_step + 1}")
-            # Perform a full validation run immediately
-            val_outputs = trainer.validate(model=pl_module, datamodule=trainer.datamodule)
-            val_class_loss = val_outputs[0]['val_class_loss']
-            val_accuracy = val_outputs[0]['val_accuracy']
-            print(f"Validation at step {trainer.global_step + 1}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
-
 print("Initializing early stopping callback...")
 # Early stopping callback
-early_stopping_callback = CustomEarlyStopping(
-    monitor='val_accuracy_step',  # Monitor validation accuracy on steps
+early_stopping_callback = EarlyStopping(
+    monitor='val_class_loss_step',  # Monitor validation loss on steps
     patience=10,  # Number of validation steps with no improvement after which training will be stopped
-    mode='max',
+    mode='min',
     verbose=True,
     check_on_train_epoch_end=False  # Check on validation steps
 )
@@ -139,17 +126,18 @@ B = args.batch_size  # Batch size
 
 # Calcolare il numero totale di batch per epoca
 num_batches_per_epoch = N // B
-print(f"Number of batches per epoch: {num_batches_per_epoch}")
 
 # Scegliere n_steps come il 20% dei batch per epoca
 n_steps = num_batches_per_epoch // 20
-print(f"Validation will run every {n_steps} steps")
+
+# Crea un'istanza del callback
+validation_callback = ValidationOnStepCallback(n_steps=n_steps)
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
     logger=wandb_logger,
-    callbacks=[checkpoint_callback, early_stopping_callback, ValidationOnStepCallback(n_steps=n_steps)],
+    callbacks=[checkpoint_callback, early_stopping_callback, validation_callback],
     log_every_n_steps=10,
     detect_anomaly=False
 )
