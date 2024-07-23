@@ -85,15 +85,15 @@ class Classifier(pl.LightningModule):
         output1 = self(sample_subset1)
         output2 = self(sample_subset2)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
-        self.log('val_class_loss', class_loss)  # Log without specifying on_step or on_epoch
-        self.log('val_class_loss_step', class_loss)  # Log on step specifically
+        self.log('val_class_loss', class_loss)
+        self.log('val_class_loss_step', class_loss)
         pred1 = torch.argmax(output1, dim=1)
         pred2 = torch.argmax(output2, dim=1)
         combined_preds = torch.cat((pred1, pred2), dim=0)
         combined_labels = torch.cat((labels, labels), dim=0)
         accuracy = self.val_accuracy(combined_preds, combined_labels)
         self.log('val_accuracy', accuracy)
-        self.log('val_accuracy_step', accuracy)  # Log on step specifically
+        self.log('val_accuracy_step', accuracy)
         precision = self.val_precision(combined_preds, combined_labels)
         self.log('val_precision', precision)
         recall = self.val_recall(combined_preds, combined_labels)
@@ -104,6 +104,6 @@ class Classifier(pl.LightningModule):
         optimizer = AdamW(self.parameters(), lr=self.hparams.initial_learning_rate, weight_decay=1e-4)
         scheduler = {
             'scheduler': torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=5, verbose=True),
-            'monitor': 'val_class_loss_step'
+            'monitor': 'val_accuracy_step'
         }
         return [optimizer], [scheduler]
