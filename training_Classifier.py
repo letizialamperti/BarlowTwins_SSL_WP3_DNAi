@@ -108,7 +108,8 @@ class ValidationOnStepCallback(pl.Callback):
 
     def on_batch_end(self, trainer, pl_module):
         current_step = trainer.global_step + 1
-        print(f"Global step: {current_step}")  # Debugging print
+        print(f"Global step: {current_step}, n_steps: {self.n_steps}")  # Debugging print
+        # Check if current_step is a multiple of n_steps
         if current_step % self.n_steps == 0:
             print(f"Running validation at step {current_step}")
             val_outputs = trainer.validate(model=pl_module, datamodule=trainer.datamodule)
@@ -135,9 +136,11 @@ B = args.batch_size  # Batch size
 
 # Calcolare il numero totale di batch per epoca
 num_batches_per_epoch = N // B
+print(f"Number of batches per epoch: {num_batches_per_epoch}")
 
 # Scegliere n_steps come il 20% dei batch per epoca
 n_steps = num_batches_per_epoch // 20
+print(f"Validation will run every {n_steps} steps")
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
