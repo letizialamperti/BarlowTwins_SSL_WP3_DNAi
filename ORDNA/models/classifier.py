@@ -94,6 +94,7 @@ class Classifier(pl.LightningModule):
         accuracy = self.val_accuracy(combined_preds, combined_labels)
         self.log('val_accuracy', accuracy)
         self.log('val_accuracy_step', accuracy)
+        print(f"Validation Step - Loss: {class_loss}, Accuracy: {accuracy}")  # Add this line to print values
         precision = self.val_precision(combined_preds, combined_labels)
         self.log('val_precision', precision)
         recall = self.val_recall(combined_preds, combined_labels)
