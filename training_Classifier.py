@@ -125,20 +125,17 @@ B = args.batch_size  # Batch size
 
 # Calcolare il numero totale di batch per epoca
 num_batches_per_epoch = N // B
+print(f"Number of batches per epoch: {num_batches_per_epoch}")
 
 # Scegliere n_steps come il 20% dei batch per epoca
 n_steps = num_batches_per_epoch // 20
-print(f"Number of batches per epoch: {num_batches_per_epoch}")
 print(f"Validation will run every {n_steps} steps")
-
-# Crea un'istanza del callback
-validation_callback = ValidationOnStepCallback(n_steps=n_steps)
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
     logger=wandb_logger,
-    callbacks=[checkpoint_callback, early_stopping_callback, validation_callback],
+    callbacks=[checkpoint_callback, early_stopping_callback, ValidationOnStepCallback(n_steps=n_steps)],
     log_every_n_steps=1,
     detect_anomaly=False
 )
