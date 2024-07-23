@@ -107,13 +107,14 @@ class ValidationOnStepCallback(pl.Callback):
         self.n_steps = n_steps
 
     def on_batch_end(self, trainer, pl_module):
-        print(f"Global step: {trainer.global_step + 1}")  # Debugging print
-        if (trainer.global_step + 1) % self.n_steps == 0:
-            print(f"Running validation at step {trainer.global_step + 1}")
+        current_step = trainer.global_step + 1
+        print(f"Global step: {current_step}")  # Debugging print
+        if current_step % self.n_steps == 0:
+            print(f"Running validation at step {current_step}")
             val_outputs = trainer.validate(model=pl_module, datamodule=trainer.datamodule)
             val_class_loss = val_outputs[0]['val_class_loss']
             val_accuracy = val_outputs[0]['val_accuracy']
-            print(f"Validation at step {trainer.global_step + 1}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
+            print(f"Validation at step {current_step}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
 
 print("Setting up Wandb logger...")
 # Setup logger e trainer
