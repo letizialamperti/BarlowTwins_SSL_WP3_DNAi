@@ -83,7 +83,7 @@ class Classifier(pl.LightningModule):
         sample_subset1, sample_subset2, labels = batch
         sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
         output1 = self(sample_subset1)
-        output2 = self(sample_subset2)
+        output2 = self.sample_subset2)
         class_loss = self.loss_fn(output1, labels) + self.loss_fn(output2, labels)
         self.log('val_class_loss', class_loss)  # Log without specifying on_step or on_epoch
         self.log('val_class_loss_step', class_loss)  # Log on step specifically
