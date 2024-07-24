@@ -2,7 +2,7 @@ import torch
 import pytorch_lightning as pl
 from pathlib import Path
 from pytorch_lightning.loggers import WandbLogger
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
+from pytorch_lightning.callbacks import ModelCheckpoint
 from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.binary_classifier import BinaryClassifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
@@ -77,29 +77,82 @@ checkpoint_callback = ModelCheckpoint(
     mode='max',
 )
 
-print("Initializing early stopping callback...")
-# Early stopping callback
-early_stopping_callback = EarlyStopping(
-    monitor='val_class_loss',  # Monitor the correct validation loss
-    patience=10,  # Number of validation steps with no improvement after which training will be stopped
-    mode='min',
-    verbose=True,
-    check_on_train_epoch_end=False  # Check on validation steps
-)
+# Custom Early stopping callback
+class CustomEarlyStopping(pl.Callback):
+    def __init__(self, monitor: str, patience: int, mode: str = 'min', min_delta: float = 0.0):
+        super().__init__()
+        self.monitor = monitor
+        self.patience = patience
+        self.mode = mode
+        self.min_delta = min_delta
+        self.wait = 0
+        self.best_score = None
+        self.stopped_epoch = 0
+        self.stop_training = False
+
+    def on_validation_end(self, trainer, pl_module):
+        current = trainer.callback_metrics.get(self.monitor)
+        if current is None:
+            return
+
+        if self.best_score is None:
+            self.best_score = current
+            return
+
+        if self.mode == 'min' and current < self.best_score - self.min_delta:
+            self.best_score = current
+            self.wait = 0
+        elif self.mode == 'max' and current > self.best_score + self.min_delta:
+            self.best_score = current
+            self.wait = 0
+        else:
+            self.wait += 1
+
+        if self.wait >= self.patience:
+            self.stopped_epoch = trainer.current_epoch
+            trainer.should_stop = True
+            self.stop_training = True
+            print(f"Early stopping triggered at epoch {self.stopped_epoch} with best {self.monitor}: {self.best_score}")
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        if self.stop_training:
+            print(f"Stopping training at step {trainer.global_step + 1} due to early stopping.")
+            trainer.should_stop = True
+            trainer.train_loop.run = False  # Stops training immediately
 
 # Callback for validation on each step
 class ValidationOnStepCallback(pl.Callback):
     def __init__(self, n_steps):
+        super().__init__()
         self.n_steps = n_steps
 
-    def on_batch_end(self, trainer, pl_module):
-        if (trainer.global_step + 1) % self.n_steps == 0:
-            print(f"Running validation at step {trainer.global_step + 1}")
-            val_outputs = trainer.validate(datamodule=trainer.datamodule, verbose=False)
-            for output in val_outputs:
-                for key, value in output.items():
-                    print(f"Logging {key} with value {value}")
-                    pl_module.log(key, value, prog_bar=True, logger=True)
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        current_step = trainer.global_step + 1
+        if current_step % self.n_steps == 0:
+            print(f"[DEBUG] Running validation at step {current_step}")
+            # Esegui manualmente la validazione
+            pl_module.eval()
+            val_dataloader = trainer.datamodule.val_dataloader()
+            val_class_loss = 0.0
+            correct = 0
+            total = 0
+            with torch.no_grad():
+                for batch in val_dataloader:
+                    sample_subset1, sample_subset2, labels = batch
+                    sample_subset1, sample_subset2, labels = sample_subset1.to(pl_module.device), sample_subset2.to(pl_module.device), labels.to(pl_module.device)
+                    output1 = pl_module(sample_subset1).view(-1)
+                    output2 = pl_module(sample_subset2).view(-1)
+                    val_class_loss += pl_module.loss_fn(output1, labels).item()
+                    val_class_loss += pl_module.loss_fn(output2, labels).item()
+                    pred1 = torch.sigmoid(output1) > 0.5
+                    pred2 = torch.sigmoid(output2) > 0.5
+                    correct += (pred1 == labels).sum().item()
+                    correct += (pred2 == labels).sum().item()
+                    total += labels.size(0) * 2  # Due predizioni per batch
+            val_class_loss /= len(val_dataloader)
+            val_accuracy = correct / total
+            print(f"[DEBUG] Validation at step {current_step}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
+            pl_module.train()
 
 print("Setting up Wandb logger...")
 # Setup logger e trainer
@@ -120,22 +173,36 @@ B = args.batch_size  # Batch size
 
 # Calcolare il numero totale di batch per epoca
 num_batches_per_epoch = N // B
+print(f"Number of batches per epoch: {num_batches_per_epoch}")
 
 # Scegliere n_steps come il 10% dei batch per epoca
 n_steps = num_batches_per_epoch // 10
+print(f"Validation will run every {n_steps} steps")
+
+# Inizializza i callback
+validation_callback = ValidationOnStepCallback(n_steps=n_steps)
+early_stopping_callback = CustomEarlyStopping(monitor='val_accuracy', patience=5, mode='max')
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
     logger=wandb_logger,
-    callbacks=[checkpoint_callback, early_stopping_callback, ValidationOnStepCallback(n_steps=n_steps)],
+    callbacks=[checkpoint_callback, validation_callback, early_stopping_callback],
     log_every_n_steps=10,
     detect_anomaly=False
 )
 
+# Ensure the callbacks are correctly passed
+print(f"Trainer callbacks: {trainer.callbacks}")
+
 # Start training
 print("Starting training...")
 trainer.fit(model=model, datamodule=datamodule)
+
+# Check if early stopping was triggered
+if any(callback.stop_training for callback in trainer.callbacks if isinstance(callback, CustomEarlyStopping)):
+    stopped_epoch = next(callback.stopped_epoch for callback in trainer.callbacks if isinstance(callback, CustomEarlyStopping))
+    print(f"Early stopping was triggered at epoch {stopped_epoch}.")
 
 # Chiudi Wandb
 print("Finishing Wandb run...")
