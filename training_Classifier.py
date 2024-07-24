@@ -1,13 +1,13 @@
 import torch
 import pytorch_lightning as pl
 from pathlib import Path
-from pytorch_lightning.loggers import WandbLogger
+# from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
-import wandb
+# import wandb
 
 # Funzione per calcolare i pesi delle classi
 def calculate_class_weights_from_csv(labels_file: Path, num_classes: int) -> torch.Tensor:
@@ -142,16 +142,16 @@ class ValidationOnStepCallback(pl.Callback):
             else:
                 print(f"[DEBUG] Validation at step {current_step} returned empty outputs")
 
-print("Setting up Wandb logger...")
-# Setup logger e trainer
-wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=Path("lightning_logs"), config=args, log_model=False)
+# print("Setting up Wandb logger...")
+# # Setup logger e trainer
+# wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=Path("lightning_logs"), config=args, log_model=False)
 
 # Inizializzazione Wandb
-print("Initializing Wandb run...")
-wandb_run = wandb.init(project='ORDNA_Class_july', config=args)
+# print("Initializing Wandb run...")
+# wandb_run = wandb.init(project='ORDNA_Class_july', config=args)
 
 # Print Wandb run URL
-print(f"Wandb run URL: {wandb_run.url}")
+# print(f"Wandb run URL: {wandb_run.url}")
 
 print("Initializing trainer...")
 
@@ -163,8 +163,8 @@ B = args.batch_size  # Batch size
 num_batches_per_epoch = N // B
 print(f"Number of batches per epoch: {num_batches_per_epoch}")
 
-# Scegliere n_steps come il 10% dei batch per epoca
-n_steps = num_batches_per_epoch // 10
+# Scegliere n_steps come il 20% dei batch per epoca
+n_steps = num_batches_per_epoch // 20
 print(f"Validation will run every {n_steps} steps")
 
 # Inizializza i callback
@@ -174,7 +174,7 @@ early_stopping_callback = CustomEarlyStopping(monitor='val_class_loss_step', pat
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
-    logger=wandb_logger,
+    # logger=wandb_logger,
     callbacks=[checkpoint_callback, validation_callback, early_stopping_callback],
     log_every_n_steps=1,
     detect_anomaly=False
@@ -193,5 +193,5 @@ if any(callback.stop_training for callback in trainer.callbacks if isinstance(ca
     print(f"Early stopping was triggered at epoch {stopped_epoch}.")
 
 # Chiudi Wandb
-print("Finishing Wandb run...")
-wandb.finish()
+# print("Finishing Wandb run...")
+# wandb.finish()
