@@ -41,7 +41,7 @@ class Classifier(pl.LightningModule):
             nn.Linear(sample_emb_dim, 256),
             nn.BatchNorm1d(256),
             nn.ReLU(),
-            nn.Dropout(0.6),
+            nn.Dropout(0.5),
             nn.Linear(256, num_classes)
         ).to(self.device)
         
@@ -79,7 +79,7 @@ class Classifier(pl.LightningModule):
         self.log('train_recall', recall)
         return class_loss
 
-    def validation_step(self, batch, batch_idx: int):
+    def validation_step(self, batch, batch_idx: int) -> torch.Tensor:
         sample_subset1, sample_subset2, labels = batch
         sample_subset1, sample_subset2, labels = sample_subset1.to(self.device), sample_subset2.to(self.device), labels.to(self.device)
         output1 = self(sample_subset1)
