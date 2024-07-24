@@ -126,11 +126,11 @@ class ValidationOnStepCallback(pl.Callback):
     def __init__(self, n_steps):
         super().__init__()
         self.n_steps = n_steps
-        
+        print("[DEBUG] ValidationOnStepCallback initialized with n_steps =", n_steps)
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         current_step = trainer.global_step + 1
-        
+        print(f"[DEBUG] on_train_batch_end called. Global step: {current_step}, n_steps: {self.n_steps}")  # Debugging print
         if current_step % self.n_steps == 0:
             print(f"[DEBUG] Running validation at step {current_step}")
             val_dataloaders = trainer.datamodule.val_dataloader()
