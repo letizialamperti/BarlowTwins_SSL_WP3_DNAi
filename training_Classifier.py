@@ -136,8 +136,8 @@ class ValidationOnStepCallback(pl.Callback):
             val_dataloaders = trainer.datamodule.val_dataloader()
             val_outputs = trainer.validate(model=pl_module, dataloaders=val_dataloaders, verbose=False)
             if val_outputs:  # Check if val_outputs is not empty
-                val_class_loss = val_outputs[0]['val_loss']
-                val_accuracy = val_outputs[0]['val_acc']
+                val_class_loss = val_outputs[0]['val_class_loss']
+                val_accuracy = val_outputs[0]['val_accuracy']
                 print(f"[DEBUG] Validation at step {current_step}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
             else:
                 print(f"[DEBUG] Validation at step {current_step} returned empty outputs")
