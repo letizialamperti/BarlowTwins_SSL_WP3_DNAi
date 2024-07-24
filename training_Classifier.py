@@ -130,11 +130,30 @@ class ValidationOnStepCallback(pl.Callback):
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         current_step = trainer.global_step + 1
         if current_step % self.n_steps == 0:
-            val_dataloaders = trainer.datamodule.val_dataloader()
-            val_outputs = trainer.validate(model=pl_module, dataloaders=val_dataloaders, verbose=False)
-            if val_outputs:  # Check if val_outputs is not empty
-                val_accuracy = val_outputs[0]['val_accuracy']
-                print(f"Validation at step {current_step}: val_accuracy = {val_accuracy}")
+            print(f"[DEBUG] Running validation at step {current_step}")
+            # Esegui manualmente la validazione
+            pl_module.eval()
+            val_dataloader = trainer.datamodule.val_dataloader()
+            val_class_loss = 0.0
+            correct = 0
+            total = 0
+            with torch.no_grad():
+                for batch in val_dataloader:
+                    sample_subset1, sample_subset2, labels = batch
+                    sample_subset1, sample_subset2, labels = sample_subset1.to(pl_module.device), sample_subset2.to(pl_module.device), labels.to(pl_module.device)
+                    output1 = pl_module(sample_subset1)
+                    output2 = pl_module(sample_subset2)
+                    val_class_loss += pl_module.loss_fn(output1, labels).item()
+                    val_class_loss += pl_module.loss_fn(output2, labels).item()
+                    _, pred1 = torch.max(output1, 1)
+                    _, pred2 = torch.max(output2, 1)
+                    correct += (pred1 == labels).sum().item()
+                    correct += (pred2 == labels).sum().item()
+                    total += labels.size(0) * 2  # Due predizioni per batch
+            val_class_loss /= len(val_dataloader)
+            val_accuracy = correct / total
+            print(f"[DEBUG] Validation at step {current_step}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
+            pl_module.train()
 
 print("Setting up Wandb logger...")
 # Setup logger e trainer
@@ -157,13 +176,13 @@ B = args.batch_size  # Batch size
 num_batches_per_epoch = N // B
 print(f"Number of batches per epoch: {num_batches_per_epoch}")
 
-# Scegliere n_steps come il 25% dei batch per epoca
-n_steps = num_batches_per_epoch // 25
+# Scegliere n_steps come il 20% dei batch per epoca
+n_steps = num_batches_per_epoch // 20
 print(f"Validation will run every {n_steps} steps")
 
 # Inizializza i callback
 validation_callback = ValidationOnStepCallback(n_steps=n_steps)
-early_stopping_callback = CustomEarlyStopping(monitor='val_accuracy', patience=3, mode='max')
+early_stopping_callback = CustomEarlyStopping(monitor='val_accuracy', patience=5, mode='max')
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
