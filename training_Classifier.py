@@ -195,3 +195,5 @@ if any(callback.stop_training for callback in trainer.callbacks if isinstance(ca
 # Chiudi Wandb
 # print("Finishing Wandb run...")
 # wandb.finish()
+#fine
+
