@@ -191,7 +191,7 @@ print(f"Validation will run every {n_steps} steps")
 
 # Inizializza i callback
 validation_callback = ValidationOnStepCallback(n_steps=n_steps)
-early_stopping_callback = CustomEarlyStopping(monitor='val_class_loss_step', patience=10, mode='min')
+early_stopping_callback = CustomEarlyStopping(monitor='val_class_loss_step', patience=3, mode='min')
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
