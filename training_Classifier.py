@@ -166,14 +166,21 @@ print(f"Number of batches per epoch: {num_batches_per_epoch}")
 n_steps = num_batches_per_epoch // 20
 print(f"Validation will run every {n_steps} steps")
 
+# Inizializza i callback
+validation_callback = ValidationOnStepCallback(n_steps=n_steps)
+early_stopping_callback = CustomEarlyStopping(monitor='val_class_loss_step', patience=10, mode='min')
+
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
     logger=wandb_logger,
-    callbacks=[checkpoint_callback, CustomEarlyStopping(monitor='val_class_loss_step', patience=10, mode='min'), ValidationOnStepCallback(n_steps=n_steps)],
+    callbacks=[checkpoint_callback, validation_callback, early_stopping_callback],
     log_every_n_steps=1,
     detect_anomaly=False
 )
+
+# Ensure the callbacks are correctly passed
+print(f"[DEBUG] Trainer callbacks: {trainer.callbacks}")
 
 # Start training
 print("Starting training...")
