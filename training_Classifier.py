@@ -7,7 +7,6 @@ from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
-# import wandb
 
 # Funzione per calcolare i pesi delle classi
 def calculate_class_weights_from_csv(labels_file: Path, num_classes: int) -> torch.Tensor:
@@ -134,47 +133,52 @@ class ValidationOnStepCallback(pl.Callback):
         if current_step % self.n_steps == 0:
             print(f"[DEBUG] Running validation at step {current_step}")
             val_dataloaders = trainer.datamodule.val_dataloader()
-            val_outputs = trainer.validate(model=pl_module, dataloaders=val_dataloaders, verbose=False)
-            if val_outputs:  # Check if val_outputs is not empty
-                val_class_loss = val_outputs[0]['val_class_loss']
-                val_accuracy = val_outputs[0]['val_accuracy']
-                print(f"[DEBUG] Validation at step {current_step}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
-            else:
-                print(f"[DEBUG] Validation at step {current_step} returned empty outputs")
+            # Esegui la validazione manualmente
+            pl_module.eval()
+            val_loss = 0.0
+            val_accuracy = 0.0
+            num_batches = 0
 
-# print("Setting up Wandb logger...")
-# # Setup logger e trainer
+            for batch in val_dataloaders:
+                sample_subset1, sample_subset2, labels = batch
+                sample_subset1, sample_subset2, labels = sample_subset1.to(pl_module.device), sample_subset2.to(pl_module.device), labels.to(pl_module.device)
+                output1 = pl_module(sample_subset1)
+                output2 = pl_module(sample_subset2)
+                class_loss = pl_module.loss_fn(output1, labels) + pl_module.loss_fn(output2, labels)
+                pred1 = torch.argmax(output1, dim=1)
+                pred2 = torch.argmax(output2, dim=1)
+                combined_preds = torch.cat((pred1, pred2), dim=0)
+                combined_labels = torch.cat((labels, labels), dim=0)
+                accuracy = pl_module.val_accuracy(combined_preds, combined_labels)
+
+                val_loss += class_loss.item()
+                val_accuracy += accuracy.item()
+                num_batches += 1
+
+            val_loss /= num_batches
+            val_accuracy /= num_batches
+
+            # Log the results
+            trainer.logger.log_metrics({
+                'val_class_loss_step': val_loss,
+                'val_accuracy_step': val_accuracy
+            }, step=current_step)
+            print(f"[DEBUG] Validation at step {current_step}: val_class_loss_step = {val_loss}, val_accuracy_step = {val_accuracy}")
+
+            pl_module.train()
+
+print("Setting up logger...")
+# Setup logger e trainer
 # wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=Path("lightning_logs"), config=args, log_model=False)
-
-# Inizializzazione Wandb
-# print("Initializing Wandb run...")
-# wandb_run = wandb.init(project='ORDNA_Class_july', config=args)
-
-# Print Wandb run URL
-# print(f"Wandb run URL: {wandb_run.url}")
-
-print("Initializing trainer...")
-
-# Parametri del dataset e batch size
-N = len(datamodule.train_dataloader().dataset)  # Numero di campioni di addestramento
-B = args.batch_size  # Batch size
-
-# Calcolare il numero totale di batch per epoca
-num_batches_per_epoch = N // B
-print(f"Number of batches per epoch: {num_batches_per_epoch}")
-
-# Scegliere n_steps come il 20% dei batch per epoca
-n_steps = num_batches_per_epoch // 20
-print(f"Validation will run every {n_steps} steps")
 
 # Inizializza i callback
 validation_callback = ValidationOnStepCallback(n_steps=n_steps)
-early_stopping_callback = CustomEarlyStopping(monitor='val_class_loss_step', patience=10, mode='min')
+early_stopping_callback = CustomEarlyStopping(monitor='val_accuracy_step', patience=10, mode='max')
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
-    # logger=wandb_logger,
+    logger=None,  # Disabilita temporaneamente il logger
     callbacks=[checkpoint_callback, validation_callback, early_stopping_callback],
     log_every_n_steps=1,
     detect_anomaly=False
@@ -192,8 +196,4 @@ if any(callback.stop_training for callback in trainer.callbacks if isinstance(ca
     stopped_epoch = next(callback.stopped_epoch for callback in trainer.callbacks if isinstance(callback, CustomEarlyStopping))
     print(f"Early stopping was triggered at epoch {stopped_epoch}.")
 
-# Chiudi Wandb
-# print("Finishing Wandb run...")
-# wandb.finish()
-#fine
-
+print("Training completed.")
