@@ -1,13 +1,13 @@
 import torch
 import pytorch_lightning as pl
 from pathlib import Path
-# from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import WandbLogger
 from pytorch_lightning.callbacks import ModelCheckpoint
 from ORDNA.data.barlow_twins_datamodule import BarlowTwinsDataModule
 from ORDNA.models.classifier import Classifier
 from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.argparser import get_args, write_config_file
-# import wandb
+import wandb
 
 # Funzione per calcolare i pesi delle classi
 def calculate_class_weights_from_csv(labels_file: Path, num_classes: int) -> torch.Tensor:
@@ -126,54 +126,26 @@ class ValidationOnStepCallback(pl.Callback):
     def __init__(self, n_steps):
         super().__init__()
         self.n_steps = n_steps
-        print("[DEBUG] ValidationOnStepCallback initialized with n_steps =", n_steps)
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         current_step = trainer.global_step + 1
-        print(f"[DEBUG] on_train_batch_end called. Global step: {current_step}, n_steps: {self.n_steps}")  # Debugging print
         if current_step % self.n_steps == 0:
-            print(f"[DEBUG] Running validation at step {current_step}")
             val_dataloaders = trainer.datamodule.val_dataloader()
-            # Esegui la validazione manualmente
-            pl_module.eval()
-            val_loss = 0.0
-            val_accuracy = 0.0
-            num_batches = 0
+            val_outputs = trainer.validate(model=pl_module, dataloaders=val_dataloaders, verbose=False)
+            if val_outputs:  # Check if val_outputs is not empty
+                val_accuracy = val_outputs[0]['val_accuracy']
+                print(f"Validation at step {current_step}: val_accuracy = {val_accuracy}")
 
-            for batch in val_dataloaders:
-                sample_subset1, sample_subset2, labels = batch
-                sample_subset1, sample_subset2, labels = sample_subset1.to(pl_module.device), sample_subset2.to(pl_module.device), labels.to(pl_module.device)
-                output1 = pl_module(sample_subset1)
-                output2 = pl_module(sample_subset2)
-                class_loss = pl_module.loss_fn(output1, labels) + pl_module.loss_fn(output2, labels)
-                pred1 = torch.argmax(output1, dim=1)
-                pred2 = torch.argmax(output2, dim=1)
-                combined_preds = torch.cat((pred1, pred2), dim=0)
-                combined_labels = torch.cat((labels, labels), dim=0)
-                accuracy = pl_module.val_accuracy(combined_preds, combined_labels)
+print("Setting up Wandb logger...")
+# Setup logger e trainer
+wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=Path("lightning_logs"), config=args, log_model=False)
 
-                val_loss += class_loss.item()
-                val_accuracy += accuracy.item()
-                num_batches += 1
+# Inizializzazione Wandb
+print("Initializing Wandb run...")
+wandb_run = wandb.init(project='ORDNA_Class_july', config=args)
 
-            val_loss /= num_batches
-            val_accuracy /= num_batches
-
-            # Log the results
-            trainer.logger.log_metrics({
-                'val_class_loss_step': val_loss,
-                'val_accuracy_step': val_accuracy
-            }, step=current_step)
-            print(f"[DEBUG] Validation at step {current_step}: val_class_loss = {val_loss}, val_accuracy = {val_accuracy}")
-
-# Setup logger e trainer (disattivato per ora)
-# print("Setting up Wandb logger...")
-# wandb_logger = WandbLogger(project='ORDNA_Class_july', save_dir=Path("lightning_logs"), config=args, log_model=False)
-
-# Inizializzazione Wandb (disattivato per ora)
-# print("Initializing Wandb run...")
-# wandb_run = wandb.init(project='ORDNA_Class_july', config=args)
-# print(f"Wandb run URL: {wandb_run.url}")
+# Print Wandb run URL
+print(f"Wandb run URL: {wandb_run.url}")
 
 print("Initializing trainer...")
 
@@ -191,19 +163,19 @@ print(f"Validation will run every {n_steps} steps")
 
 # Inizializza i callback
 validation_callback = ValidationOnStepCallback(n_steps=n_steps)
-early_stopping_callback = CustomEarlyStopping(monitor='val_class_loss_step', patience=3, mode='min')
+early_stopping_callback = CustomEarlyStopping(monitor='val_accuracy', patience=5, mode='max')
 
 trainer = pl.Trainer(
     accelerator='gpu' if torch.cuda.is_available() else 'cpu',
     max_epochs=args.max_epochs,
-    # logger=wandb_logger,
+    logger=wandb_logger,
     callbacks=[checkpoint_callback, validation_callback, early_stopping_callback],
-    log_every_n_steps=1,
+    log_every_n_steps=10,
     detect_anomaly=False
 )
 
 # Ensure the callbacks are correctly passed
-print(f"[DEBUG] Trainer callbacks: {trainer.callbacks}")
+print(f"Trainer callbacks: {trainer.callbacks}")
 
 # Start training
 print("Starting training...")
@@ -214,6 +186,6 @@ if any(callback.stop_training for callback in trainer.callbacks if isinstance(ca
     stopped_epoch = next(callback.stopped_epoch for callback in trainer.callbacks if isinstance(callback, CustomEarlyStopping))
     print(f"Early stopping was triggered at epoch {stopped_epoch}.")
 
-# Chiudi Wandb (disattivato per ora)
-# print("Finishing Wandb run...")
-# wandb.finish()
+# Chiudi Wandb
+print("Finishing Wandb run...")
+wandb.finish()
