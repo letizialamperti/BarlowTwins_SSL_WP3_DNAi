@@ -128,15 +128,16 @@ class ValidationOnStepCallback(pl.Callback):
         self.n_steps = n_steps
         print("[DEBUG] ValidationOnStepCallback initialized with n_steps =", n_steps)
 
-    def on_batch_end(self, trainer, pl_module):
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
         current_step = trainer.global_step + 1
-        print(f"[DEBUG] on_batch_end called. Global step: {current_step}, n_steps: {self.n_steps}")  # Debugging print
+        print(f"[DEBUG] on_train_batch_end called. Global step: {current_step}, n_steps: {self.n_steps}")  # Debugging print
         if current_step % self.n_steps == 0:
             print(f"[DEBUG] Running validation at step {current_step}")
-            val_outputs = trainer.validate(model=pl_module, datamodule=trainer.datamodule)
+            val_dataloaders = trainer.datamodule.val_dataloader()
+            val_outputs = trainer.validate(model=pl_module, dataloaders=val_dataloaders, verbose=False)
             if val_outputs:  # Check if val_outputs is not empty
-                val_class_loss = val_outputs[0]['val_class_loss']
-                val_accuracy = val_outputs[0]['val_accuracy']
+                val_class_loss = val_outputs[0]['val_loss']
+                val_accuracy = val_outputs[0]['val_acc']
                 print(f"[DEBUG] Validation at step {current_step}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
             else:
                 print(f"[DEBUG] Validation at step {current_step} returned empty outputs")
