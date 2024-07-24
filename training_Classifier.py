@@ -163,8 +163,8 @@ B = args.batch_size  # Batch size
 num_batches_per_epoch = N // B
 print(f"Number of batches per epoch: {num_batches_per_epoch}")
 
-# Scegliere n_steps come il 20% dei batch per epoca
-n_steps = num_batches_per_epoch // 20
+# Scegliere n_steps come il 10% dei batch per epoca
+n_steps = num_batches_per_epoch // 10
 print(f"Validation will run every {n_steps} steps")
 
 # Inizializza i callback
