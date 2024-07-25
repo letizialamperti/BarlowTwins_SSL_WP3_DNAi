@@ -153,6 +153,8 @@ class ValidationOnStepCallback(pl.Callback):
             val_class_loss /= len(val_dataloader)
             val_accuracy = correct / total
             print(f"[DEBUG] Validation at step {current_step}: val_class_loss = {val_class_loss}, val_accuracy = {val_accuracy}")
+            pl_module.log('val_class_loss', val_class_loss, prog_bar=True, logger=True)
+            pl_module.log('val_accuracy', val_accuracy, prog_bar=True, logger=True)
             pl_module.train()
 
 print("Setting up Wandb logger...")
