@@ -38,7 +38,7 @@ srun -ul $HOME/miniconda3/envs/diaus_1/bin/python training_BarlowTwins.py \
     --token_emb_dim 8 \
     --sample_repr_dim 128 \
     --sample_emb_dim 64 \
-    --barlow_twins_lambda 0.001 \
+    --barlow_twins_lambda 0.005 \
     --initial_learning_rate 1e-3 \
     --max_epochs 1
 
