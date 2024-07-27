@@ -20,8 +20,8 @@ source activate diaus_1
 
 
 # Define dataset and labels path
-DATASET_DIR="/store/sdsc/sd29/letizia/dataset_5_levels_460"
-LABELS_FILE="label/labels_5_levels.csv"
+DATASET_DIR="/store/sdsc/sd29/letizia/corse"
+LABELS_FILE="label/labels_corse_protection_5.csv"
 
 
 # Command to run the Python script
