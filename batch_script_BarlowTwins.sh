@@ -20,8 +20,8 @@ source activate diaus_1
 
 
 # Define dataset and labels path
-DATASET_DIR="/store/sdsc/sd29/letizia/sud_corse"
-LABELS_FILE="label/ordinal_label_Sud_Corse.csv"
+DATASET_DIR="/store/sdsc/sd29/letizia/cote_france"
+LABELS_FILE="label/labels_5_cote_france.csv"
 
 
 # Command to run the Python script
@@ -36,9 +36,9 @@ srun -ul $HOME/miniconda3/envs/diaus_1/bin/python training_BarlowTwins.py \
     --num_classes 4 \
     --batch_size 32 \
     --token_emb_dim 8 \
-    --sample_repr_dim 64 \
-    --sample_emb_dim 2 \
-    --barlow_twins_lambda 1 \
+    --sample_repr_dim 128 \
+    --sample_emb_dim 64 \
+    --barlow_twins_lambda 0.005 \
     --initial_learning_rate 1e-3 \
     --max_epochs 1
 
