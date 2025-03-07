@@ -11,7 +11,7 @@ class SequenceMapper():
         self.iupac_dict["u"] = len(iupac_letters)+1 # u is missing in IUPACData for some reason
 
     def map_seq(self, seq: str, pad_to_len: Optional[int] = None) -> List[int]:
-        mapped_seq = [self.iupac_dict[nucleotide] for nucleotide in seq]
+        mapped_seq = [self.iupac_dict[nucleotide.lower()] for nucleotide in seq]
         if not pad_to_len:
             return mapped_seq
         elif pad_to_len - len(mapped_seq) > 0:
