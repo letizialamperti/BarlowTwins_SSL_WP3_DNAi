@@ -73,12 +73,13 @@ class BarlowTwinsDataset(Dataset):
         return torch.stack((torch.tensor(forward), torch.tensor(reverse)), dim=1)
 
     def _get_sequences_from_df(self, df: pd.DataFrame) -> Tuple[List[str], List[str]]:
-    # Filtra le righe in cui le colonne "Forward" o "Reverse" sono vuote
-    df = df[(df['Forward'].astype(str).str.strip() != "") &
-            (df['Reverse'].astype(str).str.strip() != "")]
-    forward_sequences = df['Forward'].to_list()
-    reverse_sequences = df['Reverse'].to_list()
-    return forward_sequences, reverse_sequences
+        # Filtra le righe in cui le colonne "Forward" o "Reverse" sono vuote
+        df = df[(df['Forward'].astype(str).str.strip() != "") &
+                (df['Reverse'].astype(str).str.strip() != "")]
+        forward_sequences = df['Forward'].to_list()
+        reverse_sequences = df['Reverse'].to_list()
+        return forward_sequences, reverse_sequences
+
 
         
         return forward_sequences, reverse_sequences
