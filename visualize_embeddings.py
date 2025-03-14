@@ -27,7 +27,7 @@ model.to(device)
 
 # Imposta cartella e file di output
 version = CHECKPOINT_PATH.parents[1].name
-output_folder = "/BT_output/train"
+output_folder = "BT_output/train"
 os.makedirs(output_folder, exist_ok=True)
 output_csv_file = os.path.join(output_folder, f"embedding_coords_{DATASET.lower()}_{version}.csv")
 
