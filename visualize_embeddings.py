@@ -11,7 +11,7 @@ from ORDNA.utils.sequence_mapper import SequenceMapper
 MODEL_TYPE = 'barlow_twins' 
 CHECKPOINT_PATH = Path('checkpoints/BT_2025_64dim_-epoch=00-v1.ckpt')
 DATASET = '460_all_data'
-SAMPLE_DIR = Path('/bettik/PROJECTS/pr-qiepb/lampertl')
+SAMPLE_DIR = Path('/bettik/PROJECTS/pr-qiepb/lampertl/train')
 SEQUENCE_LENGTH = 300
 SAMPLE_SUBSET_SIZE = 500
 
@@ -27,7 +27,7 @@ model.to(device)
 
 # Imposta cartella e file di output
 version = CHECKPOINT_PATH.parents[1].name
-output_folder = "/BT_output"
+output_folder = "/BT_output/train"
 os.makedirs(output_folder, exist_ok=True)
 output_csv_file = os.path.join(output_folder, f"embedding_coords_{DATASET.lower()}_{version}.csv")
 
