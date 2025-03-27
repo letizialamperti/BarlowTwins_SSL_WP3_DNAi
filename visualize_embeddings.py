@@ -14,6 +14,7 @@ DATASET = '460_all_data'
 SAMPLE_DIR = Path('/bettik/PROJECTS/pr-qiepb/lampertl/train')
 SEQUENCE_LENGTH = 300
 SAMPLE_SUBSET_SIZE = 500
+SAMPLE_EMB_DIM = 64  # Nuovo parametro per la dimensione dell'embedding
 
 # Caricamento del modello; non passiamo più num_classes
 if MODEL_TYPE == 'barlow_twins':
@@ -33,10 +34,12 @@ output_csv_file = os.path.join(output_folder, f"embedding_coords_{DATASET.lower(
 
 sequence_mapper = SequenceMapper()
 
-# Preparazione del CSV: salviamo solo le coordinate e le deviazioni standard
+# Preparazione del CSV: header dinamico basato su SAMPLE_EMB_DIM
 with open(output_csv_file, mode='w', newline='') as file:
     writer = csv.writer(file)
-    header = ["Sample", "Dim1", "Dim2", "Standard_dev_1", "Standard_dev_2"]
+    header = ["Sample"]
+    header += [f"Dim{i+1}" for i in range(SAMPLE_EMB_DIM)]
+    header += [f"Standard_dev_{i+1}" for i in range(SAMPLE_EMB_DIM)]
     writer.writerow(header)
 
     num_files = len(list(SAMPLE_DIR.rglob('*.csv')))
@@ -56,11 +59,12 @@ with open(output_csv_file, mode='w', newline='') as file:
             # Converti le sequenze in tensori utilizzando il SequenceMapper
             forward_tensor = torch.tensor(sequence_mapper.map_seq_list(forward_sequences, SEQUENCE_LENGTH))
             reverse_tensor = torch.tensor(sequence_mapper.map_seq_list(reverse_sequences, SEQUENCE_LENGTH))
+            # Impila lungo la dimensione "direzione" e aggiungi la dimensione batch
             input_tensor = torch.stack((forward_tensor, reverse_tensor), dim=1).to(device)
-            input_tensor = input_tensor.unsqueeze(0)  # Aggiunge la dimensione del batch
+            input_tensor = input_tensor.unsqueeze(0)  # Forma: [1, N, 2, SEQUENCE_LENGTH]
 
             with torch.no_grad():
-                # Otteniamo solo l'embedding (la parte di riduzione di dimensione)
+                # Ottieni l'embedding (la parte di riduzione di dimensione)
                 sample_emb = model(input_tensor)
                 sample_emb_coords.append(sample_emb.squeeze().cpu().numpy())
 
@@ -69,8 +73,8 @@ with open(output_csv_file, mode='w', newline='') as file:
             mean_coords = np.mean(sample_emb_coords, axis=0)
             std_coords = np.std(sample_emb_coords, axis=0)
         else:
-            mean_coords = np.zeros(2)
-            std_coords = np.zeros(2)
+            mean_coords = np.zeros(SAMPLE_EMB_DIM)
+            std_coords = np.zeros(SAMPLE_EMB_DIM)
 
         # Scrive il risultato nel CSV
         row = [sample_name] + list(mean_coords) + list(std_coords)
