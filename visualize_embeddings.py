@@ -11,7 +11,7 @@ from ORDNA.utils.sequence_mapper import SequenceMapper
 MODEL_TYPE = 'barlow_twins' 
 CHECKPOINT_PATH = Path('checkpoints/BT_2025_64dim_-epoch=00-v1.ckpt')
 DATASET = '460_all_data'
-SAMPLE_DIR = Path('/bettik/PROJECTS/pr-qiepb/lampertl/train')
+SAMPLE_DIR = Path('/bettik/PROJECTS/pr-qiepb/lampertl/all')
 SEQUENCE_LENGTH = 300
 SAMPLE_SUBSET_SIZE = 500
 SAMPLE_EMB_DIM = 64  # Nuovo parametro per la dimensione dell'embedding
