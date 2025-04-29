@@ -14,8 +14,8 @@ source /applis/environments/conda.sh
 conda activate zioboia
 
 # Definire percorsi dataset e labels
-DATASET_DIR="/bettik/PROJECTS/pr-qiepb/lampertl"
-LABELS_FILE="label/labels_5_levels.csv"
+DATASET_DIR="/bettik/PROJECTS/pr-qiepb/lampertl/all"
+LABELS_FILE="label/split_corse_5_fold_01.csv"
 
 # Eseguire lo script Python
 echo "Starting the training process."
