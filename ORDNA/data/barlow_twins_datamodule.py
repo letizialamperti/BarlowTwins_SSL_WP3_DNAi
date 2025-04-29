@@ -25,8 +25,8 @@ class BarlowTwinsDataModule(pl.LightningDataModule):
     def setup(self, stage=None) -> None:
         # Legge il CSV di split con colonne 'spygen_code' e 'split'
         df = pd.read_csv(self.labels_file)
-        train_codes = df.loc[df['split'] == 'train', 'spygen_code'].tolist()
-        valid_codes = df.loc[df['split'] == 'valid', 'spygen_code'].tolist()
+        train_codes = df.loc[df['set'] == 'train', 'spygen_code'].tolist()
+        valid_codes = df.loc[df['set'] == 'valid', 'spygen_code'].tolist()
 
         # Costruisce i percorsi ai file .csv corrispondenti
         train_files = [self.samples_dir / f"{code}.csv" for code in train_codes]
