@@ -26,7 +26,7 @@ class BarlowTwinsDataset(Dataset):
             # Verifica colonne minime
             df0 = pd.read_csv(file, nrows=1)
             if not {'Forward', 'Reverse'}.issubset(df0.columns):
-                print(f"⚠️ Skip {file.name}: manca Forward/Reverse")
+                print(f"Skip {file.name}: manca Forward/Reverse")
                 continue
 
             # Conta righe dati (escluse header)
