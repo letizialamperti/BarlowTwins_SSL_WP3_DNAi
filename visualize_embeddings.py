@@ -9,7 +9,7 @@ from ORDNA.models.barlow_twins import SelfAttentionBarlowTwinsEmbedder
 from ORDNA.utils.sequence_mapper import SequenceMapper
 
 MODEL_TYPE = 'barlow_twins' 
-CHECKPOINT_PATH = Path('checkpoints/BT_2025_64dim_-epoch=00-v1.ckpt')
+CHECKPOINT_PATH = Path('checkpoints/BT_2025_64dim_-epoch=00.ckpt')
 DATASET = '460_all_data'
 SAMPLE_DIR = Path('/bettik/PROJECTS/pr-qiepb/lampertl/all')
 SEQUENCE_LENGTH = 300
