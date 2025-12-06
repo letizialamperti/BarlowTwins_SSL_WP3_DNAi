@@ -29,9 +29,9 @@ python training_BarlowTwins.py \
     --num_classes 5 \
     --batch_size 32 \
     --token_emb_dim 8 \
-    --sample_repr_dim 128 \
-    --sample_emb_dim 64 \
-    --barlow_twins_lambda 0.005 \
+    --sample_repr_dim 268324 \
+    --sample_emb_dim 134162 \
+    --barlow_twins_lambda 0.0005 \
     --initial_learning_rate 1e-3 \
     --max_epochs 1
 
