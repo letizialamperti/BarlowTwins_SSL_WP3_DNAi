@@ -27,7 +27,7 @@ python training_BarlowTwins.py \
     --sequence_length 300 \
     --sample_subset_size 500 \
     --num_classes 5 \
-    --batch_size 32 \
+    --batch_size 8 \
     --token_emb_dim 8 \
     --sample_repr_dim 268324 \
     --sample_emb_dim 134162 \
